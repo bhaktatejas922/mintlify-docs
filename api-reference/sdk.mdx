@@ -1,0 +1,82 @@
+---
+title: 'Morph SDK'
+---
+
+## Overview
+
+Morph provides a JavaScript/TypeScript integration that follows the OpenAI SDK pattern. This makes it easy to integrate code transformations into your applications.
+
+## Installation
+
+```bash
+npm install openai
+# or
+yarn add openai
+```
+
+## Basic Usage
+
+```typescript
+import OpenAI from 'openai';
+
+const USER_PROMPT = `<code>
+{original_code}
+</code>
+<update>
+{update_snippet}
+</update>`;
+
+const client = new OpenAI({
+  apiKey: process.env.MORPH_API_KEY,
+  baseURL: 'https://api.morphllm.com/v1',
+});
+
+async function executeQuery(originalCode: string, updateSnippet: string): Promise<string> {
+  const response = await client.chat.completions.create({
+    model: 'morph-v0',
+    messages: [
+      {
+        role: 'user',
+        content: USER_PROMPT.replace('{original_code}', originalCode)
+                          .replace('{update_snippet}', updateSnippet)
+      }
+    ],
+  });
+  return response.choices[0].message.content;
+}
+```
+
+## Complete Example
+
+```typescript
+// Example code to update
+const originalCode = `interface User {
+  id: string;
+  name: string;
+}
+
+function fetchUserData(userId) {
+  const response = await fetch(\`/api/users/\${userId}\`);
+  return response.json();
+}`;
+
+const updateSnippet = `interface User {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+async function fetchUserData(userId: string): Promise<User> {
+  const response = await fetch('/api/users/' + userId);
+  if (!response.ok) {
+    throw new Error('Failed to fetch user: ' + response.status);
+  }
+  return response.json();
+}`;
+
+// Apply the update
+const result = await executeQuery(originalCode, updateSnippet);
+console.log(result);
+```
+
+The result will contain the updated code with proper merging of the two snippets.

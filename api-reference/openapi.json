@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
+    "title": "Morph API",
+    "description": "API for applying code updates with lightning speed using Morph's optimized LLM",
     "license": {
       "name": "MIT"
     },
@@ -10,7 +10,7 @@
   },
   "servers": [
     {
-      "url": "http://sandbox.mintlify.com"
+      "url": "https://api.morphllm.com"
     }
   ],
   "security": [
@@ -19,54 +19,15 @@
     }
   ],
   "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Plant"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
+    "/v1/chat/completions": {
       "post": {
-        "description": "Creates a new plant in the store",
+        "description": "Apply code updates using Morph's optimized LLM",
         "requestBody": {
-          "description": "Plant to add to the store",
+          "description": "Code update request",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewPlant"
+                "$ref": "#/components/schemas/ChatCompletionRequest"
               }
             }
           },
@@ -74,17 +35,17 @@
         },
         "responses": {
           "200": {
-            "description": "plant response",
+            "description": "Chat completion response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Plant"
+                  "$ref": "#/components/schemas/ChatCompletionResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "unexpected error",
+            "description": "Bad request error",
             "content": {
               "application/json": {
                 "schema": {
@@ -92,32 +53,9 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "ID of plant to delete",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
           },
-          "400": {
-            "description": "unexpected error",
+          "401": {
+            "description": "Authentication error",
             "content": {
               "application/json": {
                 "schema": {
@@ -125,28 +63,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
-      "post": {
-        "description": "Information about a new plant added to the store",
-        "requestBody": {
-          "description": "Plant added to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
           }
         }
       }
@@ -154,55 +70,163 @@
   },
   "components": {
     "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
+      "ChatCompletionRequest": {
         "type": "object",
+        "required": [
+          "model",
+          "messages"
+        ],
         "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
+          "model": {
+            "type": "string",
+            "description": "ID of the model to use (e.g., morph-v0)",
+            "example": "morph-v0"
           },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
+          "messages": {
+            "type": "array",
+            "description": "A list of messages comprising the conversation so far",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
           }
         }
       },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
+      "Message": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "The role of the message author",
+            "enum": ["system", "user", "assistant"],
+            "example": "user"
           },
-          {
-            "required": [
-              "id"
-            ],
+          "content": {
+            "type": "string",
+            "description": "The content of the message, containing code and update snippets",
+            "example": "<code>def calculate_total(items):\n    total = 0\n    for item in items:\n        total += item.price\n    return total</code>\n<update>def calculate_total(items):\n    total = 0\n    for item in items:\n        total += item.price\n    return total * 1.1  # Add 10% tax</update>"
+          }
+        }
+      },
+      "ChatCompletionResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "object",
+          "created",
+          "choices",
+          "usage"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the completion",
+            "example": "chatcmpl-123"
+          },
+          "object": {
+            "type": "string",
+            "description": "Object type",
+            "example": "chat.completion"
+          },
+          "created": {
+            "type": "integer",
+            "description": "Unix timestamp of when the completion was created",
+            "example": 1677652288
+          },
+          "choices": {
+            "type": "array",
+            "description": "List of completion choices",
+            "items": {
+              "$ref": "#/components/schemas/Choice"
+            }
+          },
+          "usage": {
             "type": "object",
+            "description": "Usage statistics for the completion request",
             "properties": {
-              "id": {
-                "description": "Identification number of the plant",
+              "prompt_tokens": {
                 "type": "integer",
-                "format": "int64"
+                "description": "Number of tokens in the prompt",
+                "example": 25
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "description": "Number of tokens in the completion",
+                "example": 32
+              },
+              "total_tokens": {
+                "type": "integer",
+                "description": "Total number of tokens used",
+                "example": 57
               }
             }
           }
-        ]
+        }
+      },
+      "Choice": {
+        "type": "object",
+        "required": [
+          "index",
+          "message",
+          "finish_reason"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "description": "Index of the choice in the list",
+            "example": 0
+          },
+          "message": {
+            "type": "object",
+            "description": "The message generated by the model",
+            "properties": {
+              "role": {
+                "type": "string",
+                "description": "The role of the message author",
+                "example": "assistant"
+              },
+              "content": {
+                "type": "string",
+                "description": "The content of the message",
+                "example": "\ndef calculate_total(items):\n    total = 0\n    for item in items:\n        total += item.price\n    return total * 1.1  # Add 10% tax\n"
+              }
+            }
+          },
+          "finish_reason": {
+            "type": "string",
+            "description": "The reason the model stopped generating tokens",
+            "example": "stop"
+          }
+        }
       },
       "Error": {
         "required": [
-          "error",
-          "message"
+          "error"
         ],
         "type": "object",
         "properties": {
           "error": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Error message",
+                "example": "Invalid API key"
+              },
+              "type": {
+                "type": "string",
+                "description": "Error type",
+                "example": "invalid_request_error"
+              },
+              "code": {
+                "type": "string",
+                "description": "Error code",
+                "example": "invalid_api_key"
+              }
+            }
           }
         }
       }

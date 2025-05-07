@@ -1,0 +1,93 @@
+---
+title: 'Apply Code Updates'
+openapi: 'POST /v1/chat/completions'
+---
+
+## Overview
+
+Morph uses a standard OpenAI-compatible API for applying code updates. You'll use the Chat Completions endpoint with a specific formatting for your code and updates.
+
+## API Endpoint
+
+```
+POST https://api.morphllm.com/v1/chat/completions
+```
+
+## Example Request
+
+```bash
+curl https://api.morphllm.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-key" \
+  -d '{
+    "model": "morph-v0",
+    "messages": [
+      {
+        "role": "user",
+        "content": "<code>def calculate_total(items):\n    total = 0\n    for item in items:\n        total += item.price\n    return total</code>\n<update>def calculate_total(items):\n    total = 0\n    for item in items:\n        total += item.price\n    return total * 1.1  # Add 10% tax</update>"
+      }
+    ]
+  }'
+```
+
+## Input Format
+
+The `content` field in your message should contain two parts:
+- Original code wrapped in `<code>...</code>` tags
+- Update snippet wrapped in `<update>...</update>` tags
+
+The update snippet should use truncation markers like `// ... existing code ...` to indicate unchanged parts of the code. Your system prompt should include instructions on how to handle these markers.
+
+## Example with Python
+
+```python
+import openai
+import os
+
+USER_PROMPT = """<code>{original_code}</code>
+<update>{update_snippet}</update>"""
+
+client = openai.OpenAI(
+    api_key=os.getenv("MORPH_API_KEY"),
+    base_url="https://api.morphllm.com/v1"
+)
+
+def execute_query(original_code: str, update_snippet: str) -> str:
+    response = client.chat.completions.create(
+        model="morph-v0",
+        messages=[
+            {
+                "role": "user",
+                "content": USER_PROMPT.format(
+                    original_code=original_code,
+                    update_snippet=update_snippet
+                )
+            }
+        ]
+    )
+    return response.choices[0].message.content
+```
+
+## Response Format
+
+```json
+{
+  "id": "chatcmpl-123",
+  "object": "chat.completion",
+  "created": 1677652288,
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": "\ndef calculate_total(items):\n    total = 0\n    for item in items:\n        total += item.price\n    return total * 1.1  # Add 10% tax\n"
+    },
+    "finish_reason": "stop"
+  }],
+  "usage": {
+    "prompt_tokens": 25,
+    "completion_tokens": 32,
+    "total_tokens": 57
+  }
+}
+```
+

@@ -1,33 +1,51 @@
 ---
 title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+description: 'Edit your files with output from frontier models like GPT-4o and Claude instantly with Morph API'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+## Welcome to Morph API
 
-## Welcome
+Morph is the fastest way to apply updates from frontier models like GPT-4o and Claude to your code files. 
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+## Why use Morph?
+Frontier models like GPT-4o and Claude are powerful, but they can be extremely slow and expensive to apply updates to your code and files. 
+Morph Apply is a model optimized for speed, applying updates suggested by these models to original files in at 1600+ tokens per second.
+
+## How It Works
+
+Morph provides an OpenAI-compatible API that takes two primary inputs:
+1. Your original code file
+2. The update snippet (changes suggested by an LLM)
+
+Our specialized model then applies these changes with maximum speed and accuracy, preserving code structure and formatting.
+
+<img src="/images/diff-viewer.png" alt="Morph Diff Viewer" />
 
 <Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
+  title="Morph API Documentation"
+  icon="bolt"
+  href="/api-reference/endpoint/apply"
 >
-  View the OpenAPI specification file
+  View our OpenAI-compatible API
 </Card>
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All API endpoints require authentication using Bearer tokens.
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+```bash
+Authorization: Bearer your-morph-api-key
 ```
+
+To get your API key, visit the [dashboard](https://morphllm.com/dashboard) to create an account. 
+For access to our latest models, self-hosting, or business inquiries, please contact us at [info@morphllm.com](mailto:info@morphllm.com).
+
+## Base URL
+
+```bash
+https://api.morphllm.com/v1
+```
+
+## Compatible with OpenAI SDK
+
+Morph's API is compatible with the OpenAI SDK. You only need to change the base URL and API key:
