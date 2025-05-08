@@ -1,0 +1,161 @@
+---
+title: 'Embedding Model'
+description: 'Create semantic embeddings for code with our OpenAI-compatible API'
+---
+
+# Embedding Model
+
+The Embedding Model converts code and text into high-dimensional vectors that capture semantic meaning. These embeddings enable powerful search, clustering, and similarity operations for code-related applications.
+
+## OpenAI Compatibility
+
+Our Embedding Model API is fully compatible with the OpenAI API format, making it easy to integrate with existing OpenAI-based workflows.
+
+## Base URL
+
+```bash
+https://api.morphllm.com/v1/embeddings
+```
+
+## Authentication
+
+All API endpoints require authentication using Bearer tokens:
+
+```bash
+Authorization: Bearer your-morph-api-key
+```
+
+## Endpoint Reference
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+# Initialize the OpenAI client with Morph's API endpoint
+client = OpenAI(
+    api_key="your-morph-api-key",
+    base_url="https://api.morphllm.com/v1"
+)
+
+def get_embeddings(text: str) -> list[float]:
+    response = client.embeddings.create(
+        model="morph-embedding-v2",
+        input=text
+    )
+    return response.data[0].embedding
+
+# Example: Get embeddings for code chunks
+def embed_code_chunks(code_chunks: list[str]) -> list[dict]:
+    results = []
+    
+    for chunk in code_chunks:
+        embedding = get_embeddings(chunk)
+        results.append({
+            "text": chunk,
+            "embedding": embedding
+        })
+    
+    return results
+
+# Store these embeddings in a vector database of your choice
+```
+
+```javascript JavaScript
+import { OpenAI } from 'openai';
+
+const client = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function getEmbeddings(text) {
+  const response = await client.embeddings.create({
+    model: 'morph-embedding-v2',
+    input: text
+  });
+  
+  return response.data[0].embedding;
+}
+
+// Example: Get embeddings for code chunks
+async function embedCodeChunks(codeChunks) {
+  const results = [];
+  
+  for (const chunk of codeChunks) {
+    const embedding = await getEmbeddings(chunk);
+    results.push({
+      text: chunk,
+      embedding: embedding
+    });
+  }
+  
+  return results;
+}
+
+// Example usage
+const codeChunks = [
+  'function calculateSum(a, b) { return a + b; }',
+  'class UserRepository { constructor(database) { this.db = database; } }'
+];
+
+embedCodeChunks(codeChunks)
+  .then(results => console.log(results));
+```
+
+```bash cURL
+curl --request POST \
+  --url https://api.morphllm.com/v1/embeddings \
+  --header 'Authorization: Bearer your-morph-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "morph-embedding-v2",
+    "input": "Your code or text to embed"
+  }'
+```
+
+</CodeGroup>
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+| --------- | ---- | -------- | ----------- |
+| `model` | string | Yes | The model ID to use for embedding generation. Use `morph-embedding-v2`. |
+| `input` | string or array | Yes | The text to generate embeddings for. Can be a string or an array of strings. |
+| `encoding_format` | string | No | The format in which the embeddings are returned. Options are `float` and `base64`. Default is `float`. |
+
+## Response Format
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023064255, -0.009327292, ...],
+      "index": 0
+    }
+  ],
+  "model": "morph-embedding-v2",
+  "usage": {
+    "prompt_tokens": 8,
+    "total_tokens": 8
+  }
+}
+```
+
+## Features
+
+- **Code Optimized**: Specially trained to understand programming languages and code semantics
+- **High Dimensionality**: Creates rich embeddings that capture nuanced relationships between code concepts
+- **Language Support**: Works with all major programming languages including Python, JavaScript, Java, Go, and more
+- **Contextual Understanding**: Captures semantic meanings rather than just syntactic similarities
+- **Batch Processing**: Efficiently processes multiple inputs in a single API call
+
+## Common Use Cases
+
+- **Semantic Code Search**: Create powerful code search systems that understand intent
+- **Similar Code Detection**: Find similar implementations or potential code duplications
+- **Code Clustering**: Group related code snippets for organization or analysis
+- **Relevance Ranking**: Rank code snippets by relevance to a query
+- **Concept Tagging**: Automatically tag code with relevant concepts or categories 

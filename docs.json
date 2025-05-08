@@ -7,46 +7,33 @@
     "light": "#07C983",
     "dark": "#15803D"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "/favicon.ico",
   "navigation": {
     "tabs": [
       {
         "tab": "API Reference",
         "groups": [
           {
-            "group": "API Documentation",
+            "group": "Documentation",
             "pages": [
-              "api-reference/introduction"
+              "api-reference/introduction",
+              "guides/quickstart"
             ]
           },
           {
-            "group": "Endpoint Examples",
+            "group": "Guides",
             "pages": [
-              "api-reference/endpoint/apply"
-            ]
-          }
-        ]
-      },
-      {
-        "tab": "Guides",
-        "groups": [
-          {
-            "group": "Get Started",
-            "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "guides/prompting",
+              "guides/context",
+              "guides/tools"
             ]
           },
           {
-            "group": "Essentials",
+            "group": "Endpoints",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/settings",
-              "essentials/navigation",
-              "essentials/reusable-snippets"
+              "api-reference/endpoint/apply",
+              "api-reference/endpoint/embedding",
+              "api-reference/endpoint/rerank"
             ]
           }
         ]
@@ -54,11 +41,6 @@
     ],
     "global": {
       "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://docs.morphllm.com",
-          "icon": "book-open-cover"
-        },
         {
           "anchor": "Community",
           "href": "https://discord.gg/Kxxes37E",
@@ -73,8 +55,8 @@
     }
   },
   "logo": {
-    "light": "/logo/morphlogo.png",
-    "dark": "/logo/morphlogo.png",
+    "light": "/logo/newmorphlogo.jpg",
+    "dark": "/logo/newmorphlogo.jpg",
     "href": "https://morphllm.com"
   },
   "navbar": {

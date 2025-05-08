@@ -1,0 +1,197 @@
+---
+title: 'Generate Embeddings'
+openapi: 'POST /v1/embeddings'
+---
+
+<Note>
+This API is private. Contact us to get access: info@morphllm.com
+</Note>
+
+## Overview
+
+Morph provides an OpenAI-compatible API for generating embeddings from code and text.
+Morph embeddings are optimized to be state of the art for code, and are specifically made to be used on functional units like Syntax Tree Nodes (functions, classes, etc.) - not every N tokens.
+Use this in the Morph SDK to detect when files change, Syntax Tree parse, and re-embed automatically.
+
+
+## API Endpoint
+
+```
+POST https://api.morphllm.com/v1/embeddings
+```
+
+## Example Request
+<CodeGroup>
+```typescript embedding.ts
+import { OpenAI } from 'openai';
+
+const client = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function generateEmbeddings() {
+  const response = await client.embeddings.create({
+    model: "morph-embedding-v2",
+    input: "function calculateSum(a, b) { return a + b; }"
+  });
+  
+  return response.data[0].embedding;
+}
+```
+
+```python embedding.py
+import openai
+
+client = openai.OpenAI(
+  api_key="your-morph-api-key",
+  base_url="https://api.morphllm.com/v1"
+)
+
+def generate_embeddings():
+  response = client.embeddings.create(
+    model="morph-embedding-v2",
+    input="function calculateSum(a, b) { return a + b; }"
+  )
+  return response.data[0].embedding
+```
+</CodeGroup>
+
+## Input Format
+
+The request accepts the following parameters:
+
+| Parameter | Type | Required | Description |
+| --------- | ---- | -------- | ----------- |
+| `model` | string | Yes | The model ID to use for embedding generation. Use `morph-embedding-v2`. |
+| `input` | string or array | Yes | The text to generate embeddings for. Can be a string or an array of strings. |
+| `encoding_format` | string | No | The format in which the embeddings are returned. Options are `float` and `base64`. Default is `float`. |
+
+## Batch Processing Example
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="your-morph-api-key",
+    base_url="https://api.morphllm.com/v1"
+)
+
+# Example with batch inputs
+code_snippets = [
+    "function add(a, b) { return a + b; }",
+    "class User { constructor(name) { this.name = name; } }",
+    "import pandas as pd\ndf = pd.read_csv('data.csv')"
+]
+
+response = client.embeddings.create(
+    model="morph-embedding-v2",
+    input=code_snippets
+)
+
+# Access embeddings for each input
+for i, embedding_data in enumerate(response.data):
+    embedding = embedding_data.embedding
+    print(f"Embedding for snippet {i+1}: {len(embedding)} dimensions")
+```
+
+## cURL Example
+
+```bash
+curl --request POST \
+  --url https://api.morphllm.com/v1/embeddings \
+  --header 'Authorization: Bearer your-morph-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "morph-embedding-v2",
+    "input": "function calculateSum(a, b) { return a + b; }"
+  }'
+```
+
+## Response Format
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023064255, -0.009327292, ...],
+      "index": 0
+    }
+  ],
+  "model": "morph-embedding-v2",
+  "usage": {
+    "prompt_tokens": 8,
+    "total_tokens": 8
+  }
+}
+```
+
+When multiple inputs are provided, the response includes embeddings for each input:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "embedding": [0.0023064255, -0.009327292, ...],
+      "index": 0
+    },
+    {
+      "object": "embedding",
+      "embedding": [0.0103662554, -0.007650322, ...],
+      "index": 1
+    },
+    {
+      "object": "embedding",
+      "embedding": [0.0183664255, -0.002327742, ...],
+      "index": 2
+    }
+  ],
+  "model": "morph-embedding-v2",
+  "usage": {
+    "prompt_tokens": 24,
+    "total_tokens": 24
+  }
+}
+```
+
+## Usage with Vector Databases
+
+Embeddings can be stored in vector databases for efficient similarity searching:
+
+```python
+# Example with Pinecone
+import pinecone
+from openai import OpenAI
+
+# Initialize clients
+openai_client = OpenAI(
+    api_key="your-morph-api-key",
+    base_url="https://api.morphllm.com/v1"
+)
+pinecone.init(api_key="your-pinecone-api-key", environment="your-environment")
+index = pinecone.Index("code-embeddings")
+
+# Generate embedding for a code snippet
+code_snippet = "def calculate_factorial(n):\n    if n == 0:\n        return 1\n    else:\n        return n * calculate_factorial(n-1)"
+response = openai_client.embeddings.create(
+    model="morph-embedding-v2",
+    input=code_snippet
+)
+embedding = response.data[0].embedding
+
+# Store in Pinecone
+index.upsert([
+    ("snippet-1", embedding, {"snippet": code_snippet})
+])
+
+# Search for similar code
+results = index.query(
+    vector=embedding,
+    top_k=5,
+    include_metadata=True
+)
+``` 

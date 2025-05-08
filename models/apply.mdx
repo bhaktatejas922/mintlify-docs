@@ -1,0 +1,155 @@
+---
+title: 'Apply Model'
+description: 'Apply code changes with precision using our OpenAI-compatible API'
+---
+
+# Apply Model
+
+The Apply Model is designed to process code edits with high accuracy and speed. It takes your original code file and a description of the changes to be made, then applies those changes while preserving code structure and formatting.
+
+## OpenAI Compatibility
+
+Our Apply Model API is fully compatible with the OpenAI API format, making it easy to integrate with existing OpenAI-based workflows.
+
+## Base URL
+
+```bash
+https://api.morphllm.com/v1/completions
+```
+
+## Authentication
+
+All API endpoints require authentication using Bearer tokens:
+
+```bash
+Authorization: Bearer your-morph-api-key
+```
+
+## Endpoint Reference
+
+<CodeGroup>
+
+```python Python
+from openai import OpenAI
+
+# Initialize the client with Morph's API
+client = OpenAI(
+    api_key="your-morph-api-key",
+    base_url="https://api.morphllm.com/v1"
+)
+
+def apply_changes(original_code: str, changes: str):
+    response = client.completions.create(
+        model="morph-apply-v1",
+        prompt=f"ORIGINAL:\n{original_code}\n\nEDIT:\n{changes}",
+        max_tokens=4096,
+        temperature=0
+    )
+    return response.choices[0].text
+
+# Example usage
+original_code = """
+def add_numbers(a, b):
+    return a + b
+"""
+
+changes = """
+Update the function to handle additional arguments:
+def add_numbers(*args):
+    return sum(args)
+"""
+
+updated_code = apply_changes(original_code, changes)
+print(updated_code)
+```
+
+```javascript JavaScript
+import { OpenAI } from 'openai';
+
+const client = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function applyChanges(originalCode, changes) {
+  const response = await client.completions.create({
+    model: 'morph-apply-v1',
+    prompt: `ORIGINAL:\n${originalCode}\n\nEDIT:\n${changes}`,
+    max_tokens: 4096,
+    temperature: 0
+  });
+  
+  return response.choices[0].text;
+}
+
+// Example usage
+const originalCode = `
+function addNumbers(a, b) {
+  return a + b;
+}
+`;
+
+const changes = `
+Update the function to handle additional arguments:
+function addNumbers(...args) {
+  return args.reduce((sum, num) => sum + num, 0);
+}
+`;
+
+applyChanges(originalCode, changes)
+  .then(updatedCode => console.log(updatedCode));
+```
+
+```bash cURL
+curl --request POST \
+  --url https://api.morphllm.com/v1/completions \
+  --header 'Authorization: Bearer your-morph-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "morph-apply-v1",
+    "prompt": "ORIGINAL:\ndef add_numbers(a, b):\n    return a + b\n\nEDIT:\nUpdate the function to handle additional arguments:\ndef add_numbers(*args):\n    return sum(args)",
+    "max_tokens": 4096,
+    "temperature": 0
+  }'
+```
+
+</CodeGroup>
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+| --------- | ---- | -------- | ----------- |
+| `model` | string | Yes | The model ID to use for code editing. Use `morph-apply-v1`. |
+| `prompt` | string | Yes | The prompt containing the original code and requested edits. Format as `ORIGINAL:\n{code}\n\nEDIT:\n{changes}`. |
+| `max_tokens` | integer | No | Maximum number of tokens to generate. Default is `4096`. |
+| `temperature` | number | No | Controls randomness. Lower values like 0 make output more deterministic. Range is 0-1. |
+
+## Response Format
+
+```json
+{
+  "id": "cmpl-abc123",
+  "object": "completion",
+  "created": 1677858242,
+  "model": "morph-apply-v1",
+  "choices": [
+    {
+      "text": "def add_numbers(*args):\n    return sum(args)",
+      "index": 0,
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 75,
+    "completion_tokens": 38,
+    "total_tokens": 113
+  }
+}
+```
+
+## Features
+
+- **Precise Edits**: Accurately applies changes to code while maintaining proper indentation and formatting
+- **Language Agnostic**: Works with all major programming languages
+- **Structure Preservation**: Maintains the original code structure while applying only the necessary changes
+- **Fast Processing**: Optimized for quick response times, even with large code files

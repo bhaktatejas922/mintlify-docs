@@ -1,0 +1,274 @@
+---
+title: 'Rerank Results'
+api: 'POST /v1/rerank'
+---
+
+<Note>
+This API is private. Contact us to get access: info@morphllm.com
+</Note> 
+
+## Overview
+
+Morph's Rerank API improves search quality by reordering candidate results based on their relevance to a query. Unlike the Apply and Embedding endpoints, the Rerank API uses a custom endpoint specifically designed for reranking tasks.
+
+<Warning>
+Morph does not store file content by default. You need to enable remote content storage in your account settings to refer to files with embedding IDs (optional) instead of passing in the document content directly.
+</Warning>
+
+## API Endpoint
+
+```
+POST https://api.morphllm.com/v1/rerank
+```
+
+## Example Request
+
+```typescript
+async function rerankResults(
+  query: string, 
+  documents: string[], 
+  topN: number = 5
+) {
+  const response = await fetch('https://api.morphllm.com/v1/rerank', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer your-morph-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'morph-rerank-v1',
+      query: query,
+      documents: documents,
+      top_n: topN
+    })
+  });
+  
+  return await response.json();
+}
+```
+
+## Input Format
+
+The request accepts the following parameters:
+
+| Parameter | Type | Required | Description |
+| --------- | ---- | -------- | ----------- |
+| `model` | string | Yes | The model ID to use for reranking. Use `morph-rerank-v1`. |
+| `query` | string | Yes | The search query to compare documents against. |
+| `documents` | array | No* | An array of document strings to be reranked. Required if `embedding_ids` is not provided. |
+| `embedding_ids` | array | No* | An array of embedding IDs to rerank. Required if `documents` is not provided. Remote content storage must be enabled. |
+| `top_n` | integer | No | Number of top results to return. Default is all documents. |
+| `return_documents` | boolean | No | Whether to include document texts in response. Default is `true`. |
+
+\* Either `documents` or `embedding_ids` must be provided.
+
+## Using Document Content
+
+```python
+import requests
+
+def rerank_results(query, documents, top_n=5):
+    response = requests.post(
+        "https://api.morphllm.com/v1/rerank",
+        headers={
+            "Authorization": f"Bearer your-morph-api-key",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": "morph-rerank-v1",
+            "query": query,
+            "documents": documents,
+            "top_n": top_n
+        }
+    )
+    
+    return response.json()
+
+# Example usage with code documentation
+query = "How to implement JWT authentication in Express"
+documents = [
+    "This Express.js middleware provides authentication using JWT tokens and protects routes.",
+    "Express.js is a popular web framework for Node.js applications.",
+    "JWT stands for JSON Web Token and is used for securely transmitting information between parties.",
+    "This example shows how to build a RESTful API with Express.js.",
+    "Learn how to implement OAuth2 authentication in your Express.js application.",
+    "Implementing JWT authentication with Passport.js in Express applications."
+]
+
+results = rerank_results(query, documents, top_n=3)
+print(results)
+```
+
+## Using Embedding IDs
+
+When you have previously generated embeddings and enabled remote content storage, you can rerank using embedding IDs:
+
+```javascript
+async function rerankWithEmbeddingIds(query, embeddingIds, topN = 5) {
+  const response = await fetch('https://api.morphllm.com/v1/rerank', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer your-morph-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'morph-rerank-v1',
+      query: query,
+      embedding_ids: embeddingIds,
+      top_n: topN
+    })
+  });
+  
+  return await response.json();
+}
+
+// Example with embedding IDs
+const query = "React state management patterns";
+const embeddingIds = [
+  "emb_123456789",
+  "emb_987654321",
+  "emb_456789123",
+  "emb_789123456",
+  "emb_321654987"
+];
+
+rerankWithEmbeddingIds(query, embeddingIds, 3)
+  .then(results => console.log(results));
+```
+
+## cURL Examples
+
+### With Document Content
+
+```bash
+curl --request POST \
+  --url https://api.morphllm.com/v1/rerank \
+  --header 'Authorization: Bearer your-morph-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "morph-rerank-v1",
+    "query": "How to implement JWT authentication in Express",
+    "documents": [
+      "This Express.js middleware provides authentication using JWT tokens and protects routes.",
+      "Express.js is a popular web framework for Node.js applications.",
+      "JWT stands for JSON Web Token and is used for securely transmitting information between parties.",
+      "This example shows how to build a RESTful API with Express.js.",
+      "Learn how to implement OAuth2 authentication in your Express.js application.",
+      "Implementing JWT authentication with Passport.js in Express applications."
+    ],
+    "top_n": 3
+  }'
+```
+
+### With Embedding IDs
+
+```bash
+curl --request POST \
+  --url https://api.morphllm.com/v1/rerank \
+  --header 'Authorization: Bearer your-morph-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "morph-rerank-v1",
+    "query": "React state management patterns",
+    "embedding_ids": [
+      "emb_123456789",
+      "emb_987654321", 
+      "emb_456789123",
+      "emb_789123456",
+      "emb_321654987"
+    ],
+    "top_n": 3
+  }'
+```
+
+## Response Format
+
+```json
+{
+  "model": "morph-rerank-v1",
+  "results": [
+    {
+      "index": 0,
+      "document": "This Express.js middleware provides authentication using JWT tokens and protects routes.",
+      "relevance_score": 0.92
+    },
+    {
+      "index": 5,
+      "document": "Implementing JWT authentication with Passport.js in Express applications.",
+      "relevance_score": 0.87
+    },
+    {
+      "index": 2,
+      "document": "JWT stands for JSON Web Token and is used for securely transmitting information between parties.",
+      "relevance_score": 0.75
+    }
+  ]
+}
+```
+
+When using embedding IDs, the response will include the document content if available and if `return_documents` is set to `true`.
+
+## Remote Content Storage
+
+To use embedding IDs for reranking, you must enable remote content storage in your account settings. This allows Morph to retrieve the content associated with each embedding ID for reranking purposes. Without remote content storage enabled, you'll need to pass in the document content directly.
+
+Benefits of using embedding IDs:
+- Reduced payload size for large document collections
+- Improved security as content is stored in your account's secure storage
+- Ability to rerank content that was previously embedded
+
+## Integration with Search Systems
+
+The Rerank API is typically used as a second-pass ranking system in a multi-stage retrieval pipeline:
+
+```javascript
+import { OpenAI } from 'openai';
+import fetch from 'node-fetch';
+
+// Initialize OpenAI client for embeddings
+const openaiClient = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+// Example search pipeline
+async function semanticSearch(query, codebase) {
+  // 1. Generate embedding for the query
+  const embeddingResponse = await openaiClient.embeddings.create({
+    model: "morph-embedding-v2",
+    input: query
+  });
+  const queryEmbedding = embeddingResponse.data[0].embedding;
+  
+  // 2. Retrieve initial candidates using vector similarity
+  // (Simplified example - in practice, you would use a vector database)
+  const candidateDocuments = retrieveSimilarDocuments(queryEmbedding, codebase);
+  
+  // 3. Rerank candidates for more accurate results
+// Example search pipeline with embedding IDs
+async function semanticSearchWithEmbeddingIds(query, embeddingIds) {
+  // Rerank candidates for more accurate results
+  const rerankedResults = await fetch('https://api.morphllm.com/v1/rerank', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer your-morph-api-key',
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'morph-rerank-v1',
+      query: query,
+      embedding_ids: embeddingIds,
+      top_n: 5
+    })
+  }).then(res => res.json());
+  
+  return rerankedResults;
+}
+
+// Helper function to simulate vector similarity search
+function retrieveSimilarDocuments(queryEmbedding, codebase) {
+  // In practice, this would be a call to a vector database
+  return codebase.slice(0, 20); // Return first 20 documents as candidates
+}
+```
+
+This two-stage approach combines the efficiency of initial retrieval methods with the accuracy of deep neural reranking models. 

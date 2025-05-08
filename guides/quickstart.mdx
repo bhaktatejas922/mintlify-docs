@@ -1,97 +1,270 @@
 ---
 title: 'Quickstart'
-description: 'Start building awesome documentation in under 5 minutes'
+description: 'Get started with Morph in minutes'
 ---
 
-## Setup your development
+<Info>
+  **Prerequisite**: You'll need an account on [Morph](https://morphllm.com/dashboard) to obtain an API key.
+</Info>
 
-Learn how to update your docs locally and deploy them to the public.
+Follow these steps to integrate Morph into your application:
 
-### Edit and preview
+## Step 1: Get Your API Key
+
+The first step is to obtain an API key from the Morph dashboard:
+
+1. Go to [https://morphllm.com/dashboard](https://morphllm.com/dashboard)
+2. Create an account or sign in to your existing account
+3. Create a new API key or use the existing one
+
+Keep this API key secure as it will be used for authentication in your API requests.
+
+## Step 2: Use the Morph API
+
+Morph provides an OpenAI-compatible API for applying model-suggested changes to your code files:
+<Card
+  title="Morph API Documentation"
+  icon="bolt"
+  href="/api-reference/endpoint/apply"
+>
+  View our OpenAI-compatible API
+</Card>
+## Base URL
+
+```bash
+https://api.morphllm.com/v1
+```
+
+## Compatible with OpenAI SDK
+
+Morph's API is compatible with the OpenAI SDK. You only need to change the base URL and API key:
+
+<CodeGroup>
+
+```typescript morph-apply.ts
+import OpenAI from 'openai';
+
+// Initialize the OpenAI client with Morph's API endpoint
+const openai = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function applyChanges(originalCode: string, updatedCode: string): Promise<string> {
+  const response = await openai.chat.completions.create({
+    model: "morph-v2",
+    messages: [
+      {
+        role: "user",
+        content: `<code>${originalCode}</code>\n<update>${updatedCode}</update>`
+      }
+    ]
+  });
+  
+  return response.choices[0].message.content;
+}
+
+// Example usage
+const original = `function add(a: number, b: number): number {
+  return a + b;
+}`;
+
+const edits = `function add(a: number, b: number): number {
+  // Add validation
+  if (isNaN(a) || isNaN(b)) {
+    throw new Error('Both arguments must be valid numbers');
+  }
+  return a + b;
+}`;
+
+applyChanges(original, edits)
+  .then(result => console.log(result))
+  .catch(error => console.error('Error:', error));
+```
+
+```python morph_apply.py
+from openai import OpenAI
+
+# Initialize the OpenAI client with Morph's API endpoint
+client = OpenAI(
+    api_key="your-morph-api-key",
+    base_url="https://api.morphllm.com/v1"
+)
+
+def apply_changes(original_code: str, update_snippet: str) -> str:
+    response = client.chat.completions.create(
+        model="morph-v2",
+        messages=[
+            {
+                "role": "user",
+                "content": f"<code>{original_code}</code>\n<update>{update_snippet}</update>"
+            }
+        ]
+    )
+    return response.choices[0].message.content
+
+# Example usage
+original = """def add(a: float, b: float) -> float:
+    return a + b"""
+
+edits = """def add(a: float, b: float) -> float:
+    # Add validation
+    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
+        raise TypeError("Both arguments must be numbers")
+    return a + b"""
+
+result = apply_changes(original, edits)
+print(result)
+```
+
+</CodeGroup>
+
+## Step 3: Build Your Edit File Tool
+
+Create a powerful edit_file tool for your AI agent using Morph's apply model:
 
 <AccordionGroup>
-  <Accordion icon="github" title="Clone your docs locally">
-    During the onboarding process, we created a repository on your Github with
-    your docs content. You can find this repository on our
-    [dashboard](https://dashboard.mintlify.com). To clone the repository
-    locally, follow these
-    [instructions](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository)
-    in your terminal.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Preview changes">
-    Previewing helps you make sure your changes look as intended. We built a
-    command line interface to render these changes locally. 
-    1. Install the
-    [Mintlify CLI](https://www.npmjs.com/package/mintlify) to preview the
-    documentation changes locally with this command: ``` npm i -g mintlify ```
-    2. Run the following command at the root of your documentation (where
-    `docs.json` is): ``` mintlify dev ```
-    <Note>
-      If you’re currently using the legacy ```mint.json``` configuration file, please update the Mintlify CLI:
+<Accordion title="edit_file Tool Implementation">
+
+Here's a comprehensive implementation of an edit_file tool for your AI agent:
+
+```typescript edit-file-tool.ts
+import { promises as fs } from 'fs';
+import OpenAI from 'openai';
+
+// Initialize the OpenAI client with Morph's API endpoint
+const openai = new OpenAI({
+  apiKey: process.env.MORPH_API_KEY || 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
 
 
-      ```npm i -g mintlify@latest```
-      And run the new upgrade command in your docs repository:
+// Function to edit files using the Morph apply model
+// @param params - Parameters for the edit
+// @returns Result of the edit operation
 
-      ```mintlify upgrade```
-      You should now be using the new ```docs.json``` configuration file. Feel free to delete the ```mint.json``` file from your repository.
-    </Note>
-  </Accordion>
+async function editFile(params: {
+  target_file: string;
+  code_edit: string;
+}): Promise<{ success: boolean; message: string; error?: any }> {
+  try {
+    // 1. Read the original file
+    const originalContent = await fs.readFile(params.target_file, 'utf8');
+    
+    // 2. Send to Morph API
+    const response = await openai.chat.completions.create({
+      model: 'morph-v2',
+      messages: [
+        {
+          role: 'user',
+          content: `<code>${originalContent}</code>\n<update>${params.code_edit}</update>`
+        }
+      ]
+    });
+    
+    // 3. Write the updated content back to the file
+    await fs.writeFile(params.target_file, response.choices[0].message.content);
+    
+    return {
+      success: true,
+      message: `File ${params.target_file} was successfully updated`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error: ${error.message}`,
+      error
+    };
+  }
+}
+```
+
+**Tool Definition for AI Agent:**
+
+```json
+{
+  "name": "edit_file",
+  "description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by the Morph apply model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code between edited lines.",
+  "parameters": {
+    "properties": {
+      "target_file": {
+        "type": "string",
+        "description": "The target file to modify."
+      },
+      "code_edit": {
+        "type": "string",
+        "description": "Specify ONLY the precise lines of code that you wish to edit. Use // ... existing code ... for unchanged sections."
+      }
+    },
+    "required": ["target_file", "instructions", "code_edit"]
+  }
+}
+```
+
+**Input Format:**
+
+The Morph API expects two key components:
+- Original code wrapped in `<code>...</code>` tags
+- Update snippet wrapped in `<update>...</update>` tags
+
+The update snippet should use truncation markers like `// ... existing code ...` to indicate unchanged parts of the code.
+
+**Example edit pattern:**
+
+```
+// Original code:
+function calculateTotal(items) {
+  total = 0;
+  for item in items:
+    total += item.price;
+  return total;
+}
+
+// Edit with markers:
+function calculateTotal(items) {
+  // ... existing code ...
+  for item in items:
+    total += item.price;
+  return total * 1.1;  // Add 10% tax
+}
+```
+
+**Best practices:**
+
+- Use special comments (Strongly Recommended: `// ... existing code ...`) to indicate unchanged sections
+- Provide sufficient context around edits for proper placement
+- Keep instructions concise and action-oriented
+- Minimize token usage by not repeating large unchanged sections
+</Accordion>
 </AccordionGroup>
 
-### Deploy your changes
+## Enhancing Your Agent Capabilities
+
+Morph's apply model offers significant advantages over traditional LLMs for code editing:
+
+- **Speed**: Process edits at 1600+ tokens per second
+- **Accuracy**: Precise application of changes with context awareness
+- **Cost-effective**: Lower token usage compared to generating entire files
+- **Format preservation**: Maintains code structure and formatting
+
+<Tip>
+  For access to our latest models, self-hosting, or business inquiries, please contact us at [info@morphllm.com](mailto:info@morphllm.com).
+</Tip>
+
+## Troubleshooting
 
 <AccordionGroup>
+  <Accordion title="API Authorization Error">
+    If you receive an authentication error, verify that:
+    1. You're using the correct API key
+    2. The API key is included in the Authorization header as `Bearer your-morph-api-key`
+    3. Your account is in good standing. Contact us at [support@morphllm.com](mailto:support@morphllm.com) if you need help.
+  </Accordion>
 
-<Accordion icon="message-bot" title="Install our Github app">
-  Our Github app automatically deploys your changes to your docs site, so you
-  don't need to manage deployments yourself. You can find the link to install on
-  your [dashboard](https://dashboard.mintlify.com). Once the bot has been
-  successfully installed, there should be a check mark next to the commit hash
-  of the repo.
-</Accordion>
-<Accordion icon="rocket" title="Push your changes">
-  [Commit and push your changes to
-  Git](https://docs.github.com/en/get-started/using-git/pushing-commits-to-a-remote-repository#about-git-push)
-  for your changes to update in your docs site. If you push and don't see that
-  the Github app successfully deployed your changes, you can also manually
-  update your docs through our [dashboard](https://dashboard.mintlify.com).
-</Accordion>
-
+  <Accordion title="Apply Model Errors">
+    When the apply model has trouble processing your edits:
+    1. Ensure you're providing sufficient context around changed lines
+    2. Use consistent comment markers for unchanged code sections
+    3. Try simplifying complex edits into smaller, more manageable changes
+  </Accordion>
 </AccordionGroup>
-
-## Update your docs
-
-Add content directly in your files with MDX syntax and React components. You can use any of our components, or even build your own.
-
-<CardGroup>
-
-<Card title="Add Content With MDX" icon="file" href="/essentials/markdown">
-  Add content to your docs with MDX syntax.
-</Card>
-
-<Card
-  title="Add Code Blocks"
-  icon="square-code"
-  href="/essentials/code"
->
-  Add code directly to your docs with syntax highlighting.
-</Card>
-
-<Card
-  title="Add Images"
-  icon="image"
-  href="/essentials/images"
->
-  Add images to your docs to make them more engaging.
-</Card>
-
-<Card
-  title="Add Custom Components"
-  icon="puzzle-piece"
-  href="/essentials/reusable-snippets"
->
-  Add templates to your docs to make them more reusable.
-</Card>
-
-</CardGroup>

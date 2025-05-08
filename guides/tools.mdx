@@ -1,0 +1,350 @@
+---
+title: 'Agent Tools'
+description: 'Understanding and working with AI agent tool functions for effective prompting'
+---
+
+<Info>
+    Please contact us at info@morphllm.com for access to the Morph Embeddings and Morph Reranking models.
+</Info>
+
+# Agent Tools for Code and File Manipulation
+
+This guide explores the key tools available to AI agents for code and file manipulation, providing best practices for implementing and using these tools in your agent prompts.
+
+## Understanding Tool Architecture
+
+Tools transform agents from conversational assistants to action-oriented systems. Effective agents require:
+
+- **Clear tool definitions**: Functions with precise descriptions and parameters
+- **Usage protocols**: Guidelines for when and how to use each tool
+- **Error handling**: Procedures for when tools don't behave as expected
+
+## Core File Manipulation Tools
+
+<AccordionGroup>
+<Accordion title="edit_file: Modifying Code or Files with Precision">
+
+The most critical tool for coding agents, `edit_file` enables precise file modifications:
+
+```json
+{
+  "name": "edit_file",
+  "description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nFor example:\n\n\\n// ... existing code ...\\nFIRST_EDIT\\n// ... existing code ...\\nSECOND_EDIT\\n// ... existing code ...\\nTHIRD_EDIT\\n// ... existing code ...\\n\n\nYou should still bias towards repeating as few lines of the original file as possible to convey the change.\nBut, each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.\nMake sure it is clear what the edit should be.\n\nYou should specify the following arguments before the others: [target_file]",
+  "parameters": {
+    "properties": {
+      "target_file": {
+        "type": "string",
+        "description": "The target file to modify. Always specify the target file as the first argument. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is."
+      },
+      "instructions": "Clear description of the intended change",
+      "code_edit": {
+        "type": "string",
+        "description": "Specify ONLY the precise lines of code that you wish to edit. **NEVER specify or write out unchanged code**. Instead, represent all unchanged code using the comment of the language you're editing in - example: `// ... existing code ...`"
+      },
+    },
+    "required": ["target_file", "instructions", "code_edit"
+  }
+}
+```
+
+**Best practices:**
+
+- Use special comments (Strongly Recommended: `// ... existing code ...`) to indicate unchanged sections - Morph works best with this format
+- Provide sufficient context around edits for proper placement
+- Keep instructions concise and action-oriented
+- Minimize token usage by not repeating large unchanged sections
+
+**Example edit pattern:**
+
+```
+// ... existing code ...
+function calculateTotal(items) {
+  return items.reduce((total, item) => {
+    // Add tax calculation
+    const tax = item.price * 0.08;
+    return total + item.price + tax;
+  }, 0);
+}
+// ... existing code ...
+```
+</Accordion>
+
+<Accordion title="read_file: Building Context Awareness">
+
+Before editing files, agents need context about existing code:
+
+```json
+{
+  "name": "read_file",
+  "description": "Read the contents of a file. the output of this tool call will be the 1-indexed file contents from start_line_one_indexed to end_line_one_indexed_inclusive, together with a summary of the lines outside start_line_one_indexed and end_line_one_indexed_inclusive.\nNote that this call can view at most 250 lines at a time.\n\nWhen using this tool to gather information, it's your responsibility to ensure you have the COMPLETE context. Specifically, each time you call this command you should:\n1) Assess if the contents you viewed are sufficient to proceed with your task.\n2) Take note of where there are lines not shown.\n3) If the file contents you have viewed are insufficient, and you suspect they may be in lines not shown, proactively call the tool again to view those lines.\n4) When in doubt, call this tool again to gather more information. Remember that partial file views may miss critical dependencies, imports, or functionality.\n\nIn some cases, if reading a range of lines is not enough, you may choose to read the entire file.\nReading entire files is often wasteful and slow, especially for large files (i.e. more than a few hundred lines). So you should use this option sparingly.\nReading the entire file is not allowed in most cases. You are only allowed to read the entire file if it has been edited or manually attached to the conversation by the user.",
+  "parameters": {
+    "properties": {
+      "relative_workspace_path": "The path of the file to read, relative to the workspace root.",
+      "start_line_one_indexed": "The one-indexed line number to start reading from (inclusive).",
+      "end_line_one_indexed_inclusive": "The one-indexed line number to end reading at (inclusive).",
+      "should_read_entire_file": "Whether to read the entire file. Defaults to false.",
+      "explanation": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
+    },
+    "required": ["relative_workspace_path", "should_read_entire_file", "start_line_one_indexed", "end_line_one_indexed_inclusive"]
+  }
+}
+```
+
+**Best practices:**
+
+- Read before you edit - always obtain context before making changes
+- Start with targeted reads of relevant sections (lines)
+- Progress to larger context if initial reads are insufficient
+- When reading complex code, follow imports and references to build complete understanding
+</Accordion>
+</AccordionGroup>
+
+## Discovery and Navigation Tools
+
+<AccordionGroup>
+<Accordion title="codebase_search: Finding Relevant Code">
+
+Semantic search helps agents understand large codebases:
+
+```json
+{
+  "name": "codebase_search",
+  "description": "Find snippets of code from the codebase most relevant to the search query.\nThis is a semantic search tool, so the query should ask for something semantically matching what is needed.\nIf it makes sense to only search in particular directories, please specify them in the target_directories field.\nUnless there is a clear reason to use your own search query, please just reuse the user's exact query with their wording.\nTheir exact wording/phrasing can often be helpful for the semantic search query. Keeping the same exact question format can also be helpful.",
+  "parameters": {
+    "properties": {
+      "query": "The search query to find relevant code. You should reuse the user's exact query/most recent message with their wording unless there is a clear reason not to.",
+      "target_directories": "Glob patterns for directories to search over",
+      "explanation": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
+    },
+    "required": ["query"]
+  }
+}
+```
+
+**Best practices:**
+- Preserve user query wording for better semantic matching
+- Start with broad searches, then refine based on results
+- Use for understanding concepts, patterns or functions in unfamiliar code
+</Accordion>
+
+<Accordion title="list_dir: Directory Exploration">
+
+Helps agents understand project structure:
+
+```json
+{
+  "name": "list_dir",
+  "description": "List the contents of a directory. The quick tool to use for discovery, before using more targeted tools like semantic search or file reading. Useful to try to understand the file structure before diving deeper into specific files. Can be used to explore the codebase.",
+  "parameters": {
+    "properties": {
+      "relative_workspace_path": "Path to list contents of, relative to the workspace root.",
+      "explanation": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
+    },
+    "required": ["relative_workspace_path"]
+  }
+}
+```
+
+**Best practices:**
+- Start exploration with high-level directory listing
+- Use as an initial discovery step before deeper analysis
+- Build a mental map of project structure before diving into code
+</Accordion>
+
+<Accordion title="file_search: Filename Discovery">
+
+Use when you need to locate files by name or pattern:
+
+```json
+{
+  "name": "file_search",
+  "description": "Fast file search based on fuzzy matching against file path. Use if you know part of the file path but don't know where it's located exactly. Response will be capped to 10 results. Make your query more specific if need to filter results further.",
+  "parameters": {
+    "properties": {
+      "query": "Fuzzy filename to search for",
+      "explanation": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
+    },
+    "required": ["query", "explanation"]
+  }
+}
+```
+
+**Best practices:**
+- Use when you know part of a filename but not its location
+- Make queries specific to filter results when needed
+- Combine with directory exploration for effective navigation
+</Accordion>
+</AccordionGroup>
+
+## Advanced Tools
+
+<AccordionGroup>
+<Accordion title="grep_search: Pattern Matching">
+
+When you need exact matches rather than semantic search:
+
+```json
+{
+  "name": "grep_search",
+  "description": "Fast text-based regex search that finds exact pattern matches within files or directories, utilizing the ripgrep command for efficient searching.\nResults will be formatted in the style of ripgrep and can be configured to include line numbers and content.\nTo avoid overwhelming output, the results are capped at 50 matches.\nUse the include or exclude patterns to filter the search scope by file type or specific paths.\n\nThis is best for finding exact text matches or regex patterns.\nMore precise than semantic search for finding specific strings or patterns.\nThis is preferred over semantic search when we know the exact symbol/function name/etc. to search in some set of directories/file types.",
+  "parameters": {
+    "properties": {
+      "query": "The regex pattern to search for",
+      "case_sensitive": "Whether the search should be case sensitive",
+      "include_pattern": "Glob pattern for files to include (e.g. '*.ts' for TypeScript files)",
+      "exclude_pattern": "Glob pattern for files to exclude",
+      "explanation": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
+    },
+    "required": ["query"]
+  }
+}
+```
+
+**Best practices:**
+- Use for finding function declarations, variable usages, or specific patterns
+- Combine with codebase_search for comprehensive discovery
+- Use specific patterns to avoid overwhelming results
+</Accordion>
+
+<Accordion title="run_terminal_cmd: Executing Commands">
+
+Execute commands to interact with the system:
+
+```json
+{
+  "name": "run_terminal_cmd",
+  "description": "PROPOSE a command to run on behalf of the user.\nIf you have this tool, note that you DO have the ability to run commands directly on the USER's system.\nNote that the user will have to approve the command before it is executed.\nThe user may reject it if it is not to their liking, or may modify the command before approving it. If they do change it, take those changes into account.\nThe actual command will NOT execute until the user approves it. The user may not approve it immediately. Do NOT assume the command has started running.\nIf the step is WAITING for user approval, it has NOT started running.\nIn using these tools, adhere to the following guidelines:\n1. Based on the contents of the conversation, you will be told if you are in the same shell as a previous step or a different shell.\n2. If in a new shell, you should cd to the appropriate directory and do necessary setup in addition to running the command.\n3. If in the same shell, the state will persist (eg. if you cd in one step, that cwd is persisted next time you invoke this tool).\n4. For ANY commands that would use a pager or require user interaction, you should append  | cat to the command (or whatever is appropriate). Otherwise, the command will break. You MUST do this for: git, less, head, tail, more, etc.\n5. For commands that are long running/expected to run indefinitely until interruption, please run them in the background. To run jobs in the background, set is_background to true rather than changing the details of the command.\n6. Dont include any newlines in the command.",
+  "parameters": {
+    "properties": {
+      "command": "The terminal command to execute",
+      "explanation": "One sentence explanation as to why this command needs to be run and how it contributes to the goal.",
+      "is_background": "Whether the command should be run in the background",
+      "require_user_approval": "Whether the user must approve the command before it is executed. Only set this to true if the command is safe and if it matches the user's requirements for commands that should be executed automatically."
+    },
+    "required": ["command", "is_background", "require_user_approval"]
+  }
+}
+```
+
+**Best practices:**
+- Always include proper explanations for commands
+- Use the pipe to cat for any commands that would use a pager
+- Set background flag for long-running operations
+- Consider the current shell context when running commands
+</Accordion>
+
+<Accordion title="parallel_apply: Systematic Changes">
+
+For consistent changes across multiple files:
+
+```json
+{
+  "name": "parallel_apply",
+  "description": "When there are multiple locations that can be edited in parallel, with a similar type of edit, use this tool to sketch out a plan for the edits.\nYou should start with the edit_plan which describes what the edits will be.\nThen, write out the files that will be edited with the edit_files argument.\nYou shouldn't edit more than 50 files at a time.",
+  "parameters": {
+    "properties": {
+      "edit_plan": "A detailed description of the parallel edits to be applied.\nThey should be specified in a way where a model just seeing one of the files and this plan would be able to apply the edits to any of the files.\nIt should be in the first person, describing what you will do on another iteration, after seeing the file.",
+      "edit_regions": {
+        "items": {
+          "properties": {
+            "relative_workspace_path": "The path to the file to edit.",
+            "start_line": "The start line of the region to edit. 1-indexed and inclusive.",
+            "end_line": "The end line of the region to edit. 1-indexed and inclusive."
+          },
+          "required": ["relative_workspace_path"]
+        },
+        "type": "array"
+      }
+    },
+    "required": ["edit_plan", "edit_regions"]
+  }
+}
+```
+
+**Best practices:**
+- Use for refactoring, renaming, or pattern application
+- Create clear edit plans that could be applied independently
+- Provide sufficient context in edit regions
+</Accordion>
+
+<Accordion title="reapply: Error Recovery">
+
+When edits don't apply correctly:
+
+```json
+{
+  "name": "reapply",
+  "description": "Calls a smarter model to apply the last edit to the specified file.\nUse this tool immediately after the result of an edit_file tool call ONLY IF the diff is not what you expected, indicating the model applying the changes was not smart enough to follow your instructions.",
+  "parameters": {
+    "properties": {
+      "target_file": "The relative path to the file to reapply the last edit to."
+    },
+    "required": ["target_file"]
+  }
+}
+```
+
+**Best practices:**
+- Only use after a failed edit_file attempt
+- Examine what went wrong with the initial attempt
+- Consider simplifying the edit if reapply also fails
+</Accordion>
+
+<Accordion title="delete_file: File Removal">
+
+Remove files from the workspace:
+
+```json
+{
+  "name": "delete_file",
+  "description": "Deletes a file at the specified path. The operation will fail gracefully if:\n - The file doesn't exist\n - The operation is rejected for security reasons\n - The file cannot be deleted",
+  "parameters": {
+    "properties": {
+      "target_file": "The path of the file to delete, relative to the workspace root.",
+      "explanation": "One sentence explanation as to why this tool is being used, and how it contributes to the goal."
+    },
+    "required": ["target_file"]
+  }
+}
+```
+
+**Best practices:**
+- Always include clear explanations for file deletions
+- Verify the file exists before attempting deletion
+- Consider creating backups before deletion when appropriate
+</Accordion>
+</AccordionGroup>
+
+## Tool Usage Workflow
+
+Effective coding agents typically follow this tool usage pattern:
+
+1. **Discovery**: Use `list_dir` to understand project structure
+2. **Search**: Use `codebase_search` or `grep_search` to find relevant code - Use Morph Embeddings and Morph Reranking to implement the tools - contact info@morphllm.com for access
+3. **Context Building**: Use `read_file` to examine important sections
+4. **Modification**: Use `edit_file` to make precise changes
+5. **Verification**: Use `read_file` again to verify changes were applied correctly
+
+## Tool Prompting Guidelines
+
+When implementing tools in your agent prompts:
+
+1. **Clear function definitions**: Provide comprehensive JSONSchema definitions
+2. **Usage protocols**: Define when and how each tool should be used
+3. **Error handling**: Include procedures for tool failures
+4. **Context management**: Guide the agent to build sufficient context before actions
+5. **Progressive approach**: Start with discovery, then focused understanding, then action
+
+## Common Tool Anti-patterns
+
+Avoid these common mistakes in agent tool implementations:
+
+- **Insufficient context**: Editing without fully understanding the code
+- **Over-verbosity**: Including too much unchanged code in edits
+- **Premature editing**: Making changes before properly exploring the codebase
+- **Context fragmentation**: Reading small disconnected sections without building overall understanding
+- **Ignoring error recovery**: Not implementing fallbacks when tools fail
+
+## Conclusion
+
+Effective tool usage transforms AI agents from passive assistants to active agentic partners. By combining comprehensive tool definitions with clear usage protocols and error handling procedures, you can create agents that navigate, understand, and modify code with high accuracy and efficiency.

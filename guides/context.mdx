@@ -1,0 +1,450 @@
+---
+title: 'Context Selection'
+description: 'Learn how to select and optimize context for your prompts to improve model performance'
+---
+
+<Note>
+You'll need to contact us to get access to Morph SDK, Morph embeddings, and Morph re-ranking: info@morphllm.com
+</Note>
+
+# Context Selection for LLM Prompts
+
+Effective context selection is crucial for getting the best results from large language models. This guide covers strategies for determining token limits and retrieving the most relevant context using Morph's embeddings and reranking capabilities.
+
+## Determining Token Limits
+
+The first step in context selection is deciding how many tokens to include in your prompts. There are two main approaches:
+
+<AccordionGroup>
+<Accordion title="Fixed Token Limit">
+When using a fixed token limit approach, you allocate a predetermined number of tokens for context:
+
+```typescript
+// Example with fixed context window
+const MAX_CONTEXT_TOKENS = 50000; // For models with large context windows
+const TOKENS_PER_MESSAGE = 4; // Overhead per message
+const TOKENS_PER_NAME = 1; // Overhead for role name
+
+function calculateAvailableContextTokens(promptTokens: number): number {
+  const overheadTokens = TOKENS_PER_MESSAGE + TOKENS_PER_NAME;
+  return MAX_CONTEXT_TOKENS - promptTokens - overheadTokens;
+}
+```
+
+**Pros:**
+- Simple to implement
+- Predictable token usage and costs
+- Works well for standardized tasks
+
+**Cons:**
+- Not optimized for complex tasks that need more context
+- May waste tokens for simpler tasks
+</Accordion>
+
+<Accordion title="Dynamic Token Limit">
+A dynamic approach adjusts the token limit based on task complexity:
+
+```typescript
+// Example with dynamic context sizing
+function calculateContextTokens(task: Task): number {
+  let baseTokens;
+  
+  switch (task.complexity) {
+    case 'simple':
+      baseTokens = 8000;
+      break;
+    case 'medium':
+      baseTokens = 16000;
+      break;
+    case 'complex':
+      baseTokens = 32000;
+      break;
+    default:
+      baseTokens = 16000;
+  }
+  
+  // Adjust for additional factors
+  if (task.requiresCodeUnderstanding) baseTokens += 8000;
+  if (task.requiresMultiStepReasoning) baseTokens += 4000;
+  
+  return Math.min(baseTokens, 50000); // Cap at model's context limit
+}
+```
+
+**Pros:**
+- More efficient token usage
+- Better results for complex tasks
+- Can optimize for cost on simpler queries
+
+**Cons:**
+- More complex to implement
+- Requires task complexity estimation
+</Accordion>
+</AccordionGroup>
+
+## Retrieving Relevant Context
+
+Once you've determined your token budget, the next step is selecting the most relevant information for your context window.
+
+### Using Morph Embeddings
+
+Morph provides an embeddings endpoint that creates vector representations of text, which can be used for similarity search:
+
+<CodeGroup>
+
+```typescript embeddings.ts
+import OpenAI from 'openai';
+
+// Initialize the OpenAI client with Morph's API endpoint
+const openai = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function getEmbeddings(text: string): Promise<number[]> {
+  const response = await openai.embeddings.create({
+    model: "morph-embedding-v2",
+    input: text,
+  });
+  
+  return response.data[0].embedding;
+}
+
+// Example: Get embeddings for code chunks
+async function embeddCodeChunks(codeChunks: string[]): Promise<{text: string, embedding: number[]}[]> {
+  const results = [];
+  
+  for (const chunk of codeChunks) {
+    const embedding = await getEmbeddings(chunk);
+    results.push({
+      text: chunk,
+      embedding
+    });
+  }
+  
+  return results;
+}
+
+// Store these embeddings in a vector database of your choice
+```
+
+```python embeddings.py
+from openai import OpenAI
+
+# Initialize the OpenAI client with Morph's API endpoint
+client = OpenAI(
+    api_key="your-morph-api-key",
+    base_url="https://api.morphllm.com/v1"
+)
+
+def get_embeddings(text: str) -> list[float]:
+    response = client.embeddings.create(
+        model="morph-embedding-v2",
+        input=text
+    )
+    return response.data[0].embedding
+
+# Example: Get embeddings for code chunks
+def embed_code_chunks(code_chunks: list[str]) -> list[dict]:
+    results = []
+    
+    for chunk in code_chunks:
+        embedding = get_embeddings(chunk)
+        results.append({
+            "text": chunk,
+            "embedding": embedding
+        })
+    
+    return results
+
+# Store these embeddings in a vector database of your choice
+```
+
+```bash curl
+curl --request POST \
+  --url https://api.morphllm.com/v1/embeddings \
+  --header 'Authorization: Bearer your-morph-api-key' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "model": "morph-embedding-v2",
+    "input": "Your code or text to embed"
+  }'
+```
+
+</CodeGroup>
+
+### Using Morph Reranking
+
+After retrieving similar documents with embeddings, use Morph's reranking to get the most relevant results:
+
+<CodeGroup>
+
+```typescript reranking.ts
+// Using fetch with Morph's reranking endpoint
+async function rerankDocuments(query: string, documents: string[]): Promise<{document: string, relevanceScore: number}[]> {
+  const response = await fetch('https://api.morphllm.com/v1/rerank', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer your-morph-api-key`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      query,
+      documents,
+      top_n: documents.length // Get all documents ranked
+    })
+  });
+  
+  const result = await response.json();
+  return result.results.map((item: any) => ({
+    document: documents[item.index],
+    relevanceScore: item.relevance_score
+  }));
+}
+```
+
+```python reranking.py
+import requests
+
+def rerank_documents(query: str, documents: list[str]) -> list[dict]:
+    response = requests.post(
+        'https://api.morphllm.com/v1/rerank',
+        headers={
+            'Authorization': 'Bearer your-morph-api-key',
+            'Content-Type': 'application/json'
+        },
+        json={
+            'query': query,
+            'documents': documents,
+            'top_n': len(documents)  # Get all documents ranked
+        }
+    )
+    
+    result = response.json()
+    return [
+        {
+            'document': documents[item['index']],
+            'relevance_score': item['relevance_score']
+        }
+        for item in result['results']
+    ]
+```
+
+```typescript cohere-client.ts
+import { CohereClient } from 'cohere-ai';
+
+// Initialize client with Morph's endpoint and your API key
+const cohere = new CohereClient({
+  token: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function rerankWithCohere(query: string, documents: string[]): Promise<{document: string, relevanceScore: number}[]> {
+  const response = await cohere.rerank({
+    query,
+    documents: documents.map(doc => ({ text: doc })),
+    topN: documents.length
+  });
+  
+  return response.results.map(item => ({
+    document: documents[item.index],
+    relevanceScore: item.relevanceScore
+  }));
+}
+```
+
+</CodeGroup>
+
+## Basic Retrieval Strategy
+
+Here's a basic implementation that combines embedding search with reranking:
+
+```typescript
+import OpenAI from 'openai';
+import { VectorDB } from 'your-vector-db'; // Replace with your vector database
+
+const openai = new OpenAI({
+  apiKey: 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+const vectorDb = new VectorDB(); // Initialize your vector DB
+
+async function retrieveContext(query: string, maxTokens: number): Promise<string[]> {
+  // Step 1: Get query embedding
+  const queryEmbedding = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: query,
+  });
+  
+  // Step 2: Find top 10 similar documents
+  const similarDocs = await vectorDb.similaritySearch(
+    queryEmbedding.data[0].embedding,
+    10
+  );
+  
+  // Step 3: Rerank the documents
+  const rerankedDocs = await fetch('https://api.morphllm.com/v1/rerank', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer your-morph-api-key`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      query,
+      documents: similarDocs.map(doc => doc.text),
+      top_n: similarDocs.length
+    })
+  }).then(res => res.json());
+  
+  // Step 4: Select top documents that fit within token limit
+  let tokenCount = 0;
+  const selectedDocs: string[] = [];
+  
+  for (const result of rerankedDocs.results) {
+    const doc = similarDocs[result.index];
+    const docTokens = estimateTokens(doc.text);
+    
+    if (tokenCount + docTokens <= maxTokens) {
+      selectedDocs.push(doc.text);
+      tokenCount += docTokens;
+    } else {
+      break;
+    }
+  }
+  
+  return selectedDocs;
+}
+
+// Helper function to estimate tokens (actual implementation depends on your tokenizer)
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4); // Simple approximation
+}
+```
+
+## Advanced Retrieval Strategy
+
+For even better results, use a specialized query generated by an LLM:
+
+```typescript
+async function advancedContextRetrieval(userQuery: string, maxTokens: number): Promise<string[]> {
+  // Step 1: Generate an optimized lookup query using 4o
+  const lookupQueryResponse = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      {
+        role: "system",
+        content: "You are a query optimization expert. Generate the best possible search query to find relevant information based on the user's question."
+      },
+      {
+        role: "user",
+        content: `Generate a search query to find information about: ${userQuery}`
+      }
+    ]
+  });
+  
+  const optimizedQuery = lookupQueryResponse.choices[0].message.content;
+  
+  // Step 2: Get embeddings for the optimized query
+  const queryEmbedding = await openai.embeddings.create({
+    model: "morph-embedding-v2",
+    input: optimizedQuery,
+  });
+  
+  // Step 3: Find top 20 similar documents (larger initial set)
+  const similarDocs = await vectorDb.similaritySearch(
+    queryEmbedding.data[0].embedding,
+    20
+  );
+  
+  // Step 4: Rerank with the original query for better precision
+  const rerankedDocs = await fetch('https://api.morphllm.com/v1/rerank', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer your-morph-api-key`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      query: userQuery, // Use original query for reranking
+      documents: similarDocs.map(doc => doc.text),
+      top_n: similarDocs.length
+    })
+  }).then(res => res.json());
+  
+  // Step 5: Select documents that fit within token limit
+  let tokenCount = 0;
+  const selectedDocs: string[] = [];
+  
+  for (const result of rerankedDocs.results) {
+    const doc = similarDocs[result.index];
+    const docTokens = estimateTokens(doc.text);
+    
+    if (tokenCount + docTokens <= maxTokens) {
+      selectedDocs.push(doc.text);
+      tokenCount += docTokens;
+    } else {
+      break;
+    }
+  }
+  
+  return selectedDocs;
+}
+```
+
+## Monitoring and Re-embedding with Morph SDK
+
+To keep your embeddings fresh, use Morph's SDK to monitor file changes and trigger re-embeddings:
+
+```typescript
+import { MorphSDK } from '@morphllm/sdk';
+import { watch } from 'fs';
+
+const morph = new MorphSDK({
+  apiKey: 'your-morph-api-key'
+});
+
+// Watch for file changes in your codebase
+function setupFileWatcher(directory: string): void {
+  watch(directory, { recursive: true }, async (eventType, filename) => {
+    if (filename && (filename.endsWith('.js') || filename.endsWith('.ts'))) {
+      console.log(`File changed: ${filename}`);
+      
+      // Read the file content
+      const content = fs.readFileSync(`${directory}/${filename}`, 'utf-8');
+      
+      // Generate new embedding
+      const embedding = await morph.embeddings.create({
+        model: "text-embedding-3-small",
+        input: content
+      });
+      
+      // Update your vector database
+      await vectorDb.updateEmbedding(filename, embedding.data[0].embedding, content);
+    }
+  });
+}
+```
+
+## Performance Comparison
+
+Testing shows that the advanced retrieval method typically yields significant improvements:
+
+| Retrieval Strategy | Accuracy | Response Quality | Relative Performance |
+|-------------------|----------|------------------|----------------------|
+| Basic Similarity  | Good     | Moderate         | Baseline             |
+| Basic + Reranking | Better   | Good             | +10%                 |
+| Advanced Method   | Best     | Excellent        | +20%                 |
+
+## Best Practices
+
+1. **Chunk your content intelligently**: Split documents at logical boundaries like functions or paragraphs.
+
+2. **Balance precision vs. recall**: Start with a larger set of documents before reranking to ensure you don't miss relevant information.
+
+3. **Consider document diversity**: Include different types of context (code, documentation, examples) for more comprehensive responses.
+
+4. **Monitor and refine**: Track which contexts lead to better responses and adjust your strategy accordingly.
+
+5. **Use domain-specific embeddings**: When available, use embeddings trained on code or your specific domain.
+
+For access to our latest models, self-hosting, or business inquiries, please contact us at [info@morphllm.com](mailto:info@morphllm.com).
