@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Morph Documentation",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
@@ -41,6 +41,11 @@
     ],
     "global": {
       "anchors": [
+        {
+          "anchor": "Website",
+          "href": "https://morphllm.com",
+          "icon": "globe"
+        },
         {
           "anchor": "Community",
           "href": "https://discord.gg/Kxxes37E",

@@ -21,6 +21,10 @@ Morph does not store file content by default. You need to enable remote content 
 POST https://api.morphllm.com/v1/rerank
 ```
 
+## Model Versions
+
+The current version is `morph-rerank-v2`.
+
 ## Example Request
 
 ```typescript
@@ -36,7 +40,7 @@ async function rerankResults(
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'morph-rerank-v1',
+      model: 'morph-rerank-v2',
       query: query,
       documents: documents,
       top_n: topN
@@ -46,6 +50,8 @@ async function rerankResults(
   return await response.json();
 }
 ```
+
+Note that the `top_n` request parameter is optional and will default to the length of the `documents` field. Result documents will be sorted by relevance, and the `index` property can be used to determine original order.
 
 ## Input Format
 
@@ -112,7 +118,7 @@ async function rerankWithEmbeddingIds(query, embeddingIds, topN = 5) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'morph-rerank-v1',
+      model: 'morph-rerank-v2', // Use the latest model version
       query: query,
       embedding_ids: embeddingIds,
       top_n: topN
@@ -146,7 +152,7 @@ curl --request POST \
   --header 'Authorization: Bearer your-morph-api-key' \
   --header 'Content-Type: application/json' \
   --data '{
-    "model": "morph-rerank-v1",
+    "model": "morph-rerank-v2", 
     "query": "How to implement JWT authentication in Express",
     "documents": [
       "This Express.js middleware provides authentication using JWT tokens and protects routes.",
@@ -168,7 +174,7 @@ curl --request POST \
   --header 'Authorization: Bearer your-morph-api-key' \
   --header 'Content-Type: application/json' \
   --data '{
-    "model": "morph-rerank-v1",
+    "model": "morph-rerank-v2",
     "query": "React state management patterns",
     "embedding_ids": [
       "emb_123456789",
@@ -185,7 +191,7 @@ curl --request POST \
 
 ```json
 {
-  "model": "morph-rerank-v1",
+  "model": "morph-rerank-v2",
   "results": [
     {
       "index": 0,
@@ -254,7 +260,7 @@ async function semanticSearchWithEmbeddingIds(query, embeddingIds) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'morph-rerank-v1',
+      model: 'morph-rerank-v2',
       query: query,
       embedding_ids: embeddingIds,
       top_n: 5
