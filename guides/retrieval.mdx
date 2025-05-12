@@ -1,0 +1,430 @@
+---
+title: 'Retrieval'
+description: 'Build powerful code retrieval systems with Morph'
+---
+
+<Info>
+  **Prerequisite**: You'll need an account on [Morph](https://morphllm.com/dashboard) to access the full retrieval capabilities.
+</Info>
+
+## Code Retrieval Architecture
+
+Effective code retrieval is a foundational element of AI-powered coding assistance. Morph provides specialized tools for navigating and understanding codebases at scale.
+
+<Card
+  title="Morph Embeddings"
+  icon="network-wired"
+  href="/api-reference/endpoint/embeddings"
+>
+  High-performance vector embeddings optimized for code
+</Card>
+
+## State-of-the-Art Retrieval Pipeline (Recommended)
+
+Modern code retrieval systems have evolved far beyond simple embedding + reranking approaches. Today's most advanced systems employ multi-stage pipelines with specialized components:
+
+<Accordion title="Advanced Retrieval Architecture">
+  <Steps>
+    <Step title="Symbol-aware Chunking">
+      Tree-sitter → AST nodes at function/class granularity. Stores fully-qualified names, paths, imports, and call-graph edges.
+      
+      <Tip>
+        Use the **Morph SDK** for AST-aware chunking to parse and index your codebase at the symbol level. Morph's built-in integration handles language-specific parsing for optimal symbol extraction and embedding with Morph Embeddings
+      </Tip>
+      
+      <Tip>Prevents embedding "bleed-through" and keeps chunks ≤512 tokens, boosting both retriever recall and patch quality.</Tip>
+    </Step>
+    
+    <Step title="Hybrid Recall (BM25 ∪ Embeddings)">
+      Lexical BM25 guarantees that an exact symbol or error message is never missed, while Morph Embeddings retrieve semantically related code. Reciprocal-rank fusion of the two lists typically gives **+18-25 pp recall** versus dense-only retrieval on SWE-Bench.
+    </Step>
+    
+    <Step title="Agent-driven Reading (Claude + `read_file` tool)">
+      Instead of pushing entire files into the prompt, Claude inspects the retrieved metadata and decides which chunks to open using the `read_file` tool. This cuts prompt size by **40-60%** and reduces hallucinations - this is what the SOTA agents do.
+    </Step>
+    
+    <Step title="Hierarchical RAG (HiRAG)">
+      Maintain file → symbol → line pointers so the agent can drill down progressively; useful for monorepos with very large individual files.
+    </Step>
+  </Steps>
+  
+  <Tip>
+    This is the recommended pipeline for building SOTA agents.
+    To really push this - incorporate things your users do. Last file they edited, cursor position, etc...
+    This is what the best AI products do - they incorporate the data they have that others don't and incorporate it into retrieval pipelines.
+  </Tip>
+</Accordion>
+
+<Card title="SOTA Baselines" icon="trophy">
+  <table>
+    <thead>
+      <tr>
+        <th>System</th>
+        <th>Pass@1 (SWE-Bench Verified)</th>
+        <th>Key Techniques</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>SWE-agent-LM-32B (open-source)</td>
+        <td>40.2%</td>
+        <td>Late-interaction + AST chunking; Code-tuned edit head; self-verification</td>
+      </tr>
+      <tr>
+        <td>Augment Agent (Claude 3.7 + o1)</td>
+        <td>65%</td>
+        <td>Model ensemble + tool-call planner; heavy unit-test feedback loop</td>
+      </tr>
+      <tr>
+        <td>SWE-Fixer (open-source)</td>
+        <td>32.8% with only 2 LLM calls</td>
+        <td>BM25→small dense→cross-encoder cascade; separate retrieval & edit models</td>
+      </tr>
+    </tbody>
+  </table>
+</Card>
+
+## Discovery and Navigation Tools
+
+Morph provides what you need to build three key tools for code discovery and retrieval:
+
+### Semantic Code Search
+
+<Accordion title="codebase_search: Finding Relevant Code">
+
+```json
+{
+  "name": "codebase_search",
+  "description": "Find snippets of code from the codebase most relevant to the search query.\nThis is a semantic search tool, so the query should ask for something semantically matching what is needed.\nIf it makes sense to only search in particular directories, please specify them in the target_directories field.\nUnless there is a clear reason to use your own search query, please just reuse the user's exact query with their wording.\nTheir exact wording/phrasing can often be helpful for the semantic search query. Keeping the same exact question format can also be helpful.",
+  "parameters": {
+    "properties": {
+      "query": {
+        "description": "The search query to find relevant code. You should reuse the user's exact query/most recent message with their wording unless there is a clear reason not to.",
+        "type": "string"
+      },
+      "target_directories": {
+        "description": "Glob patterns for directories to search over",
+        "items": {"type": "string"},
+        "type": "array"
+      },
+      "explanation": {
+        "description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal.",
+        "type": "string"
+      }
+    },
+    "required": ["query"]
+  }
+}
+```
+
+**Implementation Architecture:**
+
+<Steps>
+  <Step title="Code Chunking">
+    Split codebase into semantically meaningful chunks (functions, classes, methods)
+    
+    <Tip>The Morph SDK provides built-in AST-aware chunking with language-specific parsers to ensure optimal symbol extraction.</Tip>
+  </Step>
+  <Step title="Embedding Generation">
+    Process code chunks with Morph Embeddings to create vector representations
+  </Step>
+  <Step title="Vector Storage">
+    Store embeddings in a vector database with metadata (file path, line numbers). For optimal performance, use the Morph Enterprise where we store embeddings in a vector database with metadata (file path, line numbers).
+  </Step>
+  <Step title="Query Processing">
+    Convert natural language queries to the same vector space
+  </Step>
+  <Step title="Retrieval & Reranking">
+    Two-stage retrieval: broad similarity search followed by precision reranking
+  </Step>
+</Steps>
+
+```typescript
+import { OpenAI } from 'openai';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize OpenAI with Morph's embedding endpoint
+const openai = new OpenAI({
+  apiKey: process.env.MORPH_API_KEY,
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+// Initialize vector database client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_KEY
+);
+
+async function semanticCodeSearch(query, options = {}) {
+  // Generate embeddings for the query
+  const embedding = await openai.embeddings.create({
+    model: "morph-embedding-v2",
+    input: query
+  });
+  
+  // Perform similarity search
+  const { data: similarDocs } = await supabase
+    .rpc('match_documents', {
+      query_embedding: embedding.data[0].embedding,
+      match_threshold: 0.7,
+      match_count: 20 // Cast a wide net initially
+    });
+    
+  // Optional: Apply reranking for precision
+  const reranked = await openai.completions.create({
+    model: "morph-rerank-v2",
+    documents: similarDocs.map(doc => doc.content),
+    query: query,
+    top_k: 5
+  });
+  
+  return reranked.data.slice(0, 5); // Return top 5 results
+}
+```
+
+**Advanced Implementation: Late-Interaction Retrieval**
+
+For the highest performance at scale, consider upgrading to a late-interaction approach:
+
+```typescript
+import { ColBERT } from 'morph-colbert';
+
+// Initialize ColBERT with Morph's model
+const colbert = new ColBERT({
+  apiKey: process.env.MORPH_API_KEY,
+  model: "MODEL_NAME"
+});
+
+async function advancedCodeSearch(query, options = {}) {
+  // Pre-tokenize and vectorize the query at token level
+  const queryEmbeddings = await colbert.encodeQuery(query);
+  
+  // Perform late-interaction search (much faster than standard cross-encoding)
+  const results = await colbert.search(
+    queryEmbeddings, 
+    { topK: 10, threshold: 0.75 }
+  );
+  
+  // No separate reranking needed - late interaction provides comparable quality
+  return results;
+}
+```
+
+**Best practices:**
+- Use the user's original query wording whenever possible for better semantic matching
+- Apply AST-aware chunking with Tree-sitter to maintain function boundaries
+- Consider hybrid recall (BM25 + embeddings) for higher accuracy
+- Late-interaction techniques like ColBERT provide cross-encoder quality at bi-encoder speed
+- Include surrounding context with each result for better understanding
+</Accordion>
+
+### Directory Exploration
+
+<Accordion title="list_dir: Directory Exploration">
+
+```json
+{
+  "name": "list_dir",
+  "description": "List the contents of a directory. The quick tool to use for discovery, before using more targeted tools like semantic search or file reading. Useful to try to understand the file structure before diving deeper into specific files. Can be used to explore the codebase.",
+  "parameters": {
+    "properties": {
+      "relative_workspace_path": {
+        "description": "Path to list contents of, relative to the workspace root.",
+        "type": "string"
+      },
+      "explanation": {
+        "description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal.",
+        "type": "string"
+      }
+    },
+    "required": ["relative_workspace_path"]
+  }
+}
+```
+
+**Implementation Strategy:**
+
+```typescript
+import { promises as fs } from 'fs';
+import * as path from 'path';
+
+async function listDirectory(dirPath, options = {}) {
+  try {
+    // Read directory contents
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    
+    // Process entries with metadata
+    const results = entries.map(entry => {
+      const isDirectory = entry.isDirectory();
+      const fullPath = path.join(dirPath, entry.name);
+      
+      return {
+        name: entry.name,
+        path: fullPath,
+        type: isDirectory ? 'directory' : 'file',
+        // Include file extension for better filtering
+        extension: !isDirectory ? path.extname(entry.name).substring(1) : null
+      };
+    });
+    
+    // Sort: directories first, then files alphabetically
+    return results.sort((a, b) => {
+      if (a.type === b.type) return a.name.localeCompare(b.name);
+      return a.type === 'directory' ? -1 : 1;
+    });
+  } catch (error) {
+    throw new Error(`Failed to list directory ${dirPath}: ${error.message}`);
+  }
+}
+```
+
+**Best practices:**
+- Use as an initial discovery step to understand project structure
+- Build a mental map of codebase organization before diving into specific files
+- Combine with file_search for targeted navigation
+</Accordion>
+
+### Filename Search
+
+<Accordion title="file_search: Filename Discovery">
+
+```json
+{
+  "name": "file_search",
+  "description": "Fast file search based on fuzzy matching against file path. Use if you know part of the file path but don't know where it's located exactly. Response will be capped to 10 results. Make your query more specific if need to filter results further.",
+  "parameters": {
+    "properties": {
+      "query": {
+        "description": "Fuzzy filename to search for",
+        "type": "string"
+      },
+      "explanation": {
+        "description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal.",
+        "type": "string"
+      }
+    },
+    "required": ["query", "explanation"]
+  }
+}
+```
+
+**Implementation Example:**
+
+```typescript
+import * as glob from 'glob';
+import * as path from 'path';
+import { distance as levenshteinDistance } from 'fastest-levenshtein';
+
+async function fileSearch(query, options = {}) {
+  try {
+    // Find all files in the workspace
+    const allFiles = await glob('**/*', { 
+      ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.git/**'],
+      nodir: true
+    });
+    
+    // Score files by similarity to query
+    const scoredFiles = allFiles.map(file => {
+      const fileName = path.basename(file);
+      const fileNameScore = levenshteinDistance(query.toLowerCase(), fileName.toLowerCase());
+      const pathScore = levenshteinDistance(query.toLowerCase(), file.toLowerCase());
+      
+      // Weigh filename matches higher than path matches
+      const score = Math.min(fileNameScore * 2, pathScore);
+      
+      return { file, score };
+    });
+    
+    // Sort by score (lower is better) and take top 10
+    return scoredFiles
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 10)
+      .map(result => result.file);
+  } catch (error) {
+    throw new Error(`File search failed: ${error.message}`);
+  }
+}
+```
+
+**Best practices:**
+- Use when you have partial knowledge of a filename or path
+- Make queries specific to reduce the number of results
+- Consider fuzzy matching algorithms that prioritize prefix matches
+</Accordion>
+
+## Integration in Agent Systems
+
+For maximum effectiveness, these tools should be integrated into a cohesive retrieval system:
+
+<Frame>
+  <img src="/images/retrieval-architecture.png" alt="Retrieval System Architecture" />
+</Frame>
+
+### Building an Effective Retrieval Pipeline
+
+<Steps>
+  <Step title="Build Codebase Index">
+    Process your entire codebase into a searchable index using Morph Embeddings
+  </Step>
+  <Step title="Implement Query Understanding">
+    Convert natural language questions into effective search queries
+  </Step>
+  <Step title="Create Hybrid Search">
+    Combine semantic search with traditional techniques for maximum coverage
+  </Step>
+  <Step title="Apply Post-Processing">
+    Use reranking to improve result quality, highlight relevant sections
+  </Step>
+  <Step title="Continuous Improvement">
+    Track user interactions to improve retrieval performance over time
+  </Step>
+</Steps>
+
+<Tip>
+  Morph's embeddings are specifically optimized for code, outperforming general-purpose embeddings on code retrieval tasks by up to 30%.
+</Tip>
+
+## Performance Considerations
+
+<AccordionGroup>
+  <Accordion title="Optimizing for Scale">
+    - Use batch processing for embedding generation
+    - Implement caching for frequent queries
+    - Consider approximate nearest neighbor algorithms for large codebases
+    - Use distributed vector storage for repositories over 1M LOC
+  </Accordion>
+  
+  <Accordion title="Balancing Precision vs. Recall">
+    - Use a two-stage approach: high recall initial search + precision reranking
+    - Adjust similarity thresholds based on use case needs
+    - Consider hybrid approaches (combining semantic + keyword search)
+    - Track performance metrics to continually improve relevance
+  </Accordion>
+  
+  <Accordion title="Latency Optimization">
+    - With a properly tuned adaptive cascade, you can achieve:
+      - P99 latency < 300ms even on 1M-file repositories
+      - P95 latency < 400ms for the entire pipeline
+      - Total context usage ≤ 3% of repository tokens per iteration
+    - Most actions remain under the 32k-token context limit even for monorepos
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Multi-modal Code Search" icon="code-branch">
+    Combine code structure understanding with natural language queries
+  </Card>
+  <Card title="Context-aware Navigation" icon="compass">
+    Integrate user history and current task for more relevant results
+  </Card>
+  <Card title="Code Evolution Tracking" icon="timeline">
+    Index code changes over time to understand development patterns
+  </Card>
+  <Card title="Cross-Repository Retrieval" icon="diagram-project">
+    Search across multiple repositories with dependency awareness
+  </Card>
+</CardGroup>
+
+Ready to implement powerful code retrieval? [Get your API key](https://morphllm.com/dashboard) or contact us at [info@morphllm.com](mailto:info@morphllm.com) for enterprise solutions.

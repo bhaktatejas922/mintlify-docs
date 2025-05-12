@@ -17,7 +17,8 @@
             "group": "Documentation",
             "pages": [
               "api-reference/introduction",
-              "guides/quickstart"
+              "guides/quickstart",
+              "guides/retrieval"
             ]
           },
           {
