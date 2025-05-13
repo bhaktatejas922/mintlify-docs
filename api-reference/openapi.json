@@ -21,7 +21,7 @@
   "paths": {
     "/v1/chat/completions": {
       "post": {
-        "description": "Apply code updates to an original file using Morph Apply",
+        "description": "Apply code updates to an original file using Morph Apply. Find your API key in the [Morph Dashboard](https://morphllm.com/dashboard).",
         "requestBody": {
           "description": "Code update request",
           "content": {

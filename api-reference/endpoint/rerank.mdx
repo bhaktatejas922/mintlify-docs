@@ -3,16 +3,12 @@ title: 'Rerank Results'
 api: 'POST /v1/rerank'
 ---
 
-<Note>
-This API is now in public beta. Contact us if you want to talk: info@morphllm.com
-</Note> 
-
 ## Overview
 
 Morph's Rerank API improves search quality by reordering candidate results based on their relevance to a query. Unlike the Apply and Embedding endpoints, the Rerank API uses a custom endpoint specifically designed for reranking tasks.
 
 <Warning>
-Morph does not store file content by default. You need to enable remote content storage in your account settings to refer to files with embedding IDs (optional) instead of passing in the document content directly.
+Morph does not store file content by default.
 </Warning>
 
 ## API Endpoint
@@ -93,12 +89,79 @@ def rerank_results(query, documents, top_n=5):
 # Example usage with code documentation
 query = "How to implement JWT authentication in Express"
 documents = [
-    "This Express.js middleware provides authentication using JWT tokens and protects routes.",
-    "Express.js is a popular web framework for Node.js applications.",
-    "JWT stands for JSON Web Token and is used for securely transmitting information between parties.",
-    "This example shows how to build a RESTful API with Express.js.",
-    "Learn how to implement OAuth2 authentication in your Express.js application.",
-    "Implementing JWT authentication with Passport.js in Express applications."
+    """const jwt = require('jsonwebtoken');
+const express = require('express');
+
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token == null) return res.sendStatus(401);
+  
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+  });
+}""",
+    """const express = require('express');
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
+app.listen(port, () => {
+  console.log(`App listening at http://localhost:${port}`);
+});""",
+    """const jwt = require('jsonwebtoken');
+
+const user = { id: 123, username: 'john_doe' };
+const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });
+const refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET);
+
+console.log('Access Token:', accessToken);""",
+    """const express = require('express');
+const router = express.Router();
+
+router.get('/users', (req, res) => {
+  res.json([{ id: 1, name: 'John' }, { id: 2, name: 'Jane' }]);
+});
+
+router.post('/users', (req, res) => {
+  const { name } = req.body;
+  res.json({ id: 3, name });
+});
+
+module.exports = router;""",
+    """const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "/auth/google/callback"
+}, (accessToken, refreshToken, profile, done) => {
+  return done(null, profile);
+}));""",
+    """const express = require('express');
+const passport = require('passport');
+const JwtStrategy = require('passport-jwt').Strategy;
+const ExtractJwt = require('passport-jwt').ExtractJwt;
+
+passport.use(new JwtStrategy({
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: process.env.JWT_SECRET
+}, (payload, done) => {
+  User.findById(payload.sub, (err, user) => {
+    if (err) return done(err, false);
+    if (user) return done(null, user);
+    return done(null, false);
+  });
+}));"""
 ]
 
 results = rerank_results(query, documents, top_n=3)
@@ -155,12 +218,12 @@ curl --request POST \
     "model": "morph-rerank-v2", 
     "query": "How to implement JWT authentication in Express",
     "documents": [
-      "This Express.js middleware provides authentication using JWT tokens and protects routes.",
-      "Express.js is a popular web framework for Node.js applications.",
-      "JWT stands for JSON Web Token and is used for securely transmitting information between parties.",
-      "This example shows how to build a RESTful API with Express.js.",
-      "Learn how to implement OAuth2 authentication in your Express.js application.",
-      "Implementing JWT authentication with Passport.js in Express applications."
+      "const jwt = require(\"jsonwebtoken\");\nconst express = require(\"express\");\n\nfunction authenticateToken(req, res, next) {\n  const authHeader = req.headers[\"authorization\"];\n  const token = authHeader && authHeader.split(\" \")[1];\n  \n  if (token == null) return res.sendStatus(401);\n  \n  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {\n    if (err) return res.sendStatus(403);\n    req.user = user;\n    next();\n  });\n}",
+      "const express = require(\"express\");\nconst app = express();\nconst port = 3000;\n\napp.use(express.json());\n\napp.get(\"/\", (req, res) => {\n  res.send(\"Hello World!\");\n});\n\napp.listen(port, () => {\n  console.log(`App listening at http://localhost:${port}`);\n});",
+      "const jwt = require(\"jsonwebtoken\");\n\nconst user = { id: 123, username: \"john_doe\" };\nconst accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: \"15m\" });\nconst refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET);\n\nconsole.log(\"Access Token:\", accessToken);",
+      "const express = require(\"express\");\nconst router = express.Router();\n\nrouter.get(\"/users\", (req, res) => {\n  res.json([{ id: 1, name: \"John\" }, { id: 2, name: \"Jane\" }]);\n});\n\nrouter.post(\"/users\", (req, res) => {\n  const { name } = req.body;\n  res.json({ id: 3, name });\n});\n\nmodule.exports = router;",
+      "const passport = require(\"passport\");\nconst GoogleStrategy = require(\"passport-google-oauth20\").Strategy;\n\npassport.use(new GoogleStrategy({\n  clientID: process.env.GOOGLE_CLIENT_ID,\n  clientSecret: process.env.GOOGLE_CLIENT_SECRET,\n  callbackURL: \"/auth/google/callback\"\n}, (accessToken, refreshToken, profile, done) => {\n  return done(null, profile);\n}));",
+      "const express = require(\"express\");\nconst passport = require(\"passport\");\nconst JwtStrategy = require(\"passport-jwt\").Strategy;\nconst ExtractJwt = require(\"passport-jwt\").ExtractJwt;\n\npassport.use(new JwtStrategy({\n  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),\n  secretOrKey: process.env.JWT_SECRET\n}, (payload, done) => {\n  User.findById(payload.sub, (err, user) => {\n    if (err) return done(err, false);\n    if (user) return done(null, user);\n    return done(null, false);\n  });\n}));"
     ],
     "top_n": 3
   }'
@@ -191,21 +254,31 @@ curl --request POST \
 
 ```json
 {
+  "id": "rerank-26b29083d49a4c1e82032a95549a8633",
   "model": "morph-rerank-v2",
+  "usage": {
+    "total_tokens": 21
+  },
   "results": [
     {
       "index": 0,
-      "document": "This Express.js middleware provides authentication using JWT tokens and protects routes.",
+      "document": {
+        "text": "const jwt = require('jsonwebtoken');\nconst express = require('express');\n\nfunction authenticateToken(req, res, next) {\n  const authHeader = req.headers['authorization'];\n  const token = authHeader && authHeader.split(' ')[1];\n  \n  if (token == null) return res.sendStatus(401);\n  \n  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {\n    if (err) return res.sendStatus(403);\n    req.user = user;\n    next();\n  });\n}"
+      },
       "relevance_score": 0.92
     },
     {
       "index": 5,
-      "document": "Implementing JWT authentication with Passport.js in Express applications.",
+      "document": {
+        "text": "const express = require('express');\nconst passport = require('passport');\nconst JwtStrategy = require('passport-jwt').Strategy;\nconst ExtractJwt = require('passport-jwt').ExtractJwt;\n\npassport.use(new JwtStrategy({\n  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),\n  secretOrKey: process.env.JWT_SECRET\n}, (payload, done) => {\n  User.findById(payload.sub, (err, user) => {\n    if (err) return done(err, false);\n    if (user) return done(null, user);\n    return done(null, false);\n  });\n}));"
+      },
       "relevance_score": 0.87
     },
     {
       "index": 2,
-      "document": "JWT stands for JSON Web Token and is used for securely transmitting information between parties.",
+      "document": {
+        "text": "const jwt = require('jsonwebtoken');\n\nconst user = { id: 123, username: 'john_doe' };\nconst accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '15m' });\nconst refreshToken = jwt.sign(user, process.env.REFRESH_TOKEN_SECRET);\n\nconsole.log('Access Token:', accessToken);"
+      },
       "relevance_score": 0.75
     }
   ]

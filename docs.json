@@ -14,10 +14,16 @@
         "tab": "API Reference",
         "groups": [
           {
-            "group": "Documentation",
+            "group": "Getting Started",
             "pages": [
               "api-reference/introduction",
-              "guides/quickstart",
+              "guides/quickstart"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "guides/apply",
               "guides/retrieval"
             ]
           },
