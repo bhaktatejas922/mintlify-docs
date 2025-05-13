@@ -9,12 +9,10 @@ description: 'Build powerful code retrieval systems with Morph'
 
 ## Code Retrieval Architecture
 
-Effective code retrieval is a foundational element of AI-powered coding assistance. Morph provides specialized tools for navigating and understanding codebases at scale.
-
 <Card
   title="Morph Embeddings"
   icon="network-wired"
-  href="/api-reference/endpoint/embeddings"
+  href="/api-reference/embedding"
 >
   High-performance vector embeddings optimized for code
 </Card>
@@ -49,9 +47,9 @@ Modern code retrieval systems have evolved far beyond simple embedding + reranki
   </Steps>
   
   <Tip>
-    This is the recommended pipeline for building SOTA agents.
-    To really push this - incorporate things your users do. Last file they edited, cursor position, etc...
-    This is what the best AI products do - they incorporate the data they have that others don't and incorporate it into retrieval pipelines.
+    This is the recommended pipeline for building SOTA agents that companies like Cursor, OpenAI, and Anthropic are using.
+    - To really push this - incorporate things your users do. Last file they edited, cursor position, etc...
+    - This is what the best AI products do - they incorporate the data they have that others don't and incorporate it into retrieval pipelines.
   </Tip>
 </Accordion>
 
@@ -351,14 +349,6 @@ async function fileSearch(query, options = {}) {
 - Make queries specific to reduce the number of results
 - Consider fuzzy matching algorithms that prioritize prefix matches
 </Accordion>
-
-## Integration in Agent Systems
-
-For maximum effectiveness, these tools should be integrated into a cohesive retrieval system:
-
-<Frame>
-  <img src="/images/retrieval-architecture.png" alt="Retrieval System Architecture" />
-</Frame>
 
 ### Building an Effective Retrieval Pipeline
 

@@ -3,60 +3,110 @@ title: 'Agent Tools'
 description: 'Understanding and working with AI agent tool functions for effective prompting'
 ---
 
-<Info>
-    Please contact us at info@morphllm.com for access to the Morph Embeddings and Morph Reranking models.
-</Info>
-
-# Agent Tools for Code and File Manipulation
-
-This guide explores the key tools available to AI agents for code and file manipulation, providing best practices for implementing and using these tools in your agent prompts.
-
 ## Understanding Tool Architecture
 
-Tools transform agents from conversational assistants to action-oriented systems. Effective agents require:
+Effective agent tools require clear function definitions with precise descriptions and parameters, established usage protocols for when and how to use each tool, and robust error handling procedures for unexpected behaviors.
+## The Edit File Tool
 
-- **Clear tool definitions**: Functions with precise descriptions and parameters
-- **Usage protocols**: Guidelines for when and how to use each tool
-- **Error handling**: Procedures for when tools don't behave as expected
+The `edit_file` tool is the most critical tool for coding agents. It enables precise, fast modifications to any file in your codebase without requiring the reasoning agent to rewrite entire files.
 
-## Core File Manipulation Tools
+<Card title="Quick Start" icon="rocket" href="/guides/oneshot" horizontal>
+  One-Shot the edit_file tool using your AI IDE.
+</Card>
 
-<AccordionGroup>
-<Accordion title="edit_file: Modifying Code or Files with Precision">
+### How Edit File Works
 
-The most critical tool for coding agents, `edit_file` enables precise file modifications:
+The tool operates on a simple principle: **show only what changes, mark everything else as unchanged**. This approach:
 
-```json
-{
-  "name": "edit_file",
-  "description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nFor example:\n\n\\n// ... existing code ...\\nFIRST_EDIT\\n// ... existing code ...\\nSECOND_EDIT\\n// ... existing code ...\\nTHIRD_EDIT\\n// ... existing code ...\\n\n\nYou should still bias towards repeating as few lines of the original file as possible to convey the change.\nBut, each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.\nMake sure it is clear what the edit should be.\n\nYou should specify the following arguments before the others: [target_file]",
-  "parameters": {
-    "properties": {
-      "target_file": {
-        "type": "string",
-        "description": "The target file to modify. Always specify the target file as the first argument. You can use either a relative path in the workspace or an absolute path. If an absolute path is provided, it will be preserved as is."
-      },
-      "instructions": "Clear description of the intended change",
-      "code_edit": {
-        "type": "string",
-        "description": "Specify ONLY the precise lines of code that you wish to edit. **NEVER specify or write out unchanged code**. Instead, represent all unchanged code using the comment of the language you're editing in - example: `// ... existing code ...`"
-      },
-    },
-    "required": ["target_file", "code_edit"]
-  }
-}
+- **Minimizes token usage** by not repeating large unchanged sections
+- **Reduces errors** by providing clear context about what should change
+- **Enables precise edits** in large files without full rewrites
+- **Works with any file type** - code, configs, docs, anything
+
+### Key Concepts
+
+1. **Precision**: Only specify the lines that need to change
+2. **Context Markers**: Use `// ... existing code ...` to indicate unchanged sections
+3. **Clear Boundaries**: Provide enough surrounding context for proper placement
+
+## Example Prompt: 
+```
+{"description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nFor example:\n\n\\n// ... existing code ...\\nFIRST_EDIT\\n// ... existing code ...\\nSECOND_EDIT\\n// ... existing code ...\\nTHIRD_EDIT\\n// ... existing code ...\\n\n\nYou should still bias towards repeating as few lines of the original file as possible to convey the change.\nBut, each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.\nMake sure it is clear what the edit should be.\n\nYou should specify the following arguments before the others: [target_file]", "name": "edit_file", "parameters": {"properties": {"blocking": {"description": "Whether this tool call should block the client from making further edits to the file until this call is complete. If true, the client will not be able to make further edits to the file until this call is complete.", "type": "boolean"}, "code_edit": {"description": "Specify ONLY the precise lines of code that you wish to edit. NEVER specify or write out unchanged code. Instead, represent all unchanged code using the comment of the language you're editing in - example: // ... existing code ...", "type": "string"}, "instructions": {"description": "A single sentence instruction describing what you are going to do for the sketched edit. This is used to assist the less intelligent model in applying the edit. Please use the first person to describe what you are going to do. Dont repeat what you have said previously in normal messages. And use it to disambiguate uncertainty in the edit.", "type": "string"}, "target_file": {"description": "The target file to modify. Always specify the target file as the first argument and use the relative path in the workspace of the file to edit", "type": "string"}}, "required": ["target_file", "instructions", "code_edit", "blocking"], "type": "object"}}
+
+{"description": "Fast file search based on fuzzy matching against file path. Use if you know part of the file path but don't know where it's located exactly. Response will be capped to 10 results. Make your query more specific if need to filter results further.", "name": "file_search", "parameters": {"properties": {"explanation": {"description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal.", "type": "string"}, "query": {"description": "Fuzzy filename to search for", "type": "string"}}, "required": ["query", "explanation"], "type": "object"}}
+
+{"description": "Deletes a file at the specified path. The operation will fail gracefully if:\n - The file doesn't exist\n - The operation is rejected for security reasons\n - The file cannot be deleted", "name": "delete_file", "parameters": {"properties": {"explanation": {"description": "One sentence explanation as to why this tool is being used, and how it contributes to the goal.", "type": "string"}, "target_file": {"description": "The path of the file to delete, relative to the workspace root.", "type": "string"}}, "required": ["target_file"], "type": "object"}}
 ```
 
-**Best practices:**
+<Accordion title="Implementation Example">
 
-- Use special comments (Strongly Recommended: `// ... existing code ...`) to indicate unchanged sections - Morph works best with this format
-- Provide sufficient context around edits for proper placement
-- Keep instructions concise and action-oriented
-- Minimize token usage by not repeating large unchanged sections
+This example demonstrates how to create an `edit_file` tool that uses Morph's fast apply API to modify files:
+<Note>
+   Many research papers have shown that having LLMs do code edits via normal JSON tool calls results in worse overall coding performance due to constrained decoding.
+   For the best coding performance, you can use XML tags for your tool calls. See how [Cline](https://docs.cline.bot/exploring-clines-tools/cline-tools-guide#cline-tools-reference-guide) and [Cursor](https://github.com/jujumilk3/leaked-system-prompts/blob/main/cursor-ide-sonnet_20241224.md) use XML tags for all their tool calls.
+</Note>
 
-**Example edit pattern:**
+``` typescript
+import { tool } from 'ai';
+import { z } from 'zod';
+import * as fs from 'fs/promises';
+import { OpenAI } from 'openai';
 
+const morphClient = new OpenAI({
+  apiKey: process.env.MORPH_API_KEY,
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+const editFile = tool({
+  description: "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nFor example:\n\n\\n// ... existing code ...\\nFIRST_EDIT\\n// ... existing code ...\\nSECOND_EDIT\\n// ... existing code ...\\nTHIRD_EDIT\\n// ... existing code ...\\n\n\nYou should still bias towards repeating as few lines of the original file as possible to convey the change.\nBut, each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.\nMake sure it is clear what the edit should be.\n\nYou should specify the following arguments before the others: [target_file]",
+  parameters: z.object({
+    target_file: z.string().describe('The target file to modify. Always specify the target file as the first argument and use the relative path in the workspace of the file to edit'),
+    instructions: z.string().describe('A single sentence instruction describing what you are going to do for the sketched edit. This is used to assist the less intelligent model in applying the edit. Please use the first person to describe what you are going to do. Dont repeat what you have said previously in normal messages. And use it to disambiguate uncertainty in the edit.'),
+    code_edit: z.string().describe('Specify ONLY the precise lines of code that you wish to edit. NEVER specify or write out unchanged code. Instead, represent all unchanged code using the comment of the language you\'re editing in - example: // ... existing code ...'),
+  }),
+  execute: async ({ target_file, instructions, code_edit, blocking }) => {
+    try {
+      // Read the current file content
+      const originalCode = await fs.readFile(target_file, 'utf-8');
+      
+      // Use Morph's fast apply API to generate the updated code
+      const response = await morphClient.chat.completions.create({
+        model: "morph-v2",
+        messages: [
+          {
+            role: "user",
+            content: `<code>${originalCode}</code>\n<update>${code_edit}</update>`
+          }
+        ],
+        stream: false // set to true if you want to stream the response
+      });
+      
+      const updatedCode = response.choices[0].message.content;
+      
+      // Write the updated content back to the file
+      await fs.writeFile(target_file, updatedCode, 'utf-8');
+      
+      return {
+        success: true,
+        message: `Successfully applied edit to ${target_file}: ${instructions}`,
+        changes_applied: code_edit
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `Failed to edit ${target_file}: ${error.message}`
+      };
+    }
+  },
+});
 ```
+
+</Accordion>
+
+### Edit Format Examples
+
+**JavaScript/TypeScript files:**
+``` javascript
 // ... existing code ...
 function calculateTotal(items) {
   return items.reduce((total, item) => {
@@ -67,8 +117,66 @@ function calculateTotal(items) {
 }
 // ... existing code ...
 ```
-</Accordion>
 
+**Python files:**
+``` python
+# ... existing code ...
+def calculate_total(items):
+    total = 0
+    for item in items:
+        // Add tax calculation
+        tax = item.price * 0.08
+        total += item.price + tax
+    return total
+# ... existing code ...
+```
+
+
+### Best Practices
+
+- **Read before you edit**: Always examine the file first to understand its structure
+- **Minimal changes**: Only include the lines that actually need modification
+- **Sufficient context**: Include enough surrounding lines for unambiguous placement
+- **Language-appropriate comments**: Use the correct comment syntax for each file type
+- **Clear instructions**: Provide concise descriptions of what you're changing
+
+### Common Patterns
+
+**Adding new code:**
+```javascript
+// ... existing code ...
+export function newFunction() {
+  return "This is new functionality";
+}
+// ... existing code ...
+```
+
+**Modifying existing code:**
+```javascript
+// ... existing code ...
+function existingFunction() {
+  // Updated implementation
+  return "Modified behavior";
+}
+// ... existing code ...
+```
+
+**Multiple changes in sequence:**
+```javascript
+// ... existing code ...
+const FIRST_CHANGE = "new value";
+// ... existing code ...
+function secondChange() {
+  return "updated function";
+}
+// ... existing code ...
+const THIRD_CHANGE = "another new value";
+// ... existing code ...
+```
+
+## Core File Manipulation Tools
+
+<AccordionGroup>
 <Accordion title="read_file: Building Context Awareness">
 
 Before editing files, agents need context about existing code:
@@ -320,8 +428,8 @@ Remove files from the workspace:
 
 Effective coding agents typically follow this tool usage pattern:
 
-1. **Discovery**: Use `list_dir` to understand project structure
-2. **Search**: Use `codebase_search` or `grep_search` to find relevant code - Use Morph Embeddings and Morph Reranking to implement the tools - contact info@morphllm.com for access
+1. **Discovery**: Use `list_dir` to understand project structure, print full file paths
+2. **Search**: Use `codebase_search` or `grep_search` to find relevant code - Use Morph Embeddings and Morph Reranking to implement more advanced search for larger repos
 3. **Context Building**: Use `read_file` to examine important sections
 4. **Modification**: Use `edit_file` to make precise changes
 5. **Verification**: Use `read_file` again to verify changes were applied correctly

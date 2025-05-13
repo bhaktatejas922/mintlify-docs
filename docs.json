@@ -14,10 +14,16 @@
         "tab": "API Reference",
         "groups": [
           {
-            "group": "Documentation",
+            "group": "Getting Started",
             "pages": [
               "api-reference/introduction",
-              "guides/quickstart",
+              "guides/quickstart"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "guides/apply",
               "guides/retrieval"
             ]
           },
@@ -25,7 +31,6 @@
             "group": "Guides",
             "pages": [
               "guides/prompting",
-              "guides/context",
               "guides/tools"
             ]
           },
@@ -60,6 +65,14 @@
       ]
     }
   },
+  "contextual": {
+    "options": [
+      "copy",
+      "view",
+      "chatgpt",
+      "claude"
+    ]
+  },
   "logo": {
     "light": "/logo/newmorphlogo.jpg",
     "dark": "/logo/newmorphlogo.jpg",
@@ -69,7 +82,7 @@
     "links": [
       {
         "label": "Support",
-        "href": "mailto:info@morphllm.com"
+        "href": "https://morphllm.com/contact"
       }
     ],
     "primary": {

@@ -6,6 +6,19 @@ description: 'Get started with Morph in minutes'
 <Info>
   **Prerequisite**: You'll need an account on [Morph](https://morphllm.com/dashboard) to obtain an API key.
 </Info>
+<Card
+  icon="zap"
+  href="/guides/oneshot"
+>
+  <div className="relative">
+    <img className="hidden dark:block my-0 pointer-events-none rounded-lg" src="https://mintlify.s3.us-west-1.amazonaws.com/mintlify/images/installation/local-development-dark.png" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg"></div>
+    <div className="absolute bottom-4 left-4 right-4">
+      <h3 className="text-2xl font-bold text-white mb-2">One-Shot the edit_file tool into your repo</h3>
+      <p className="text-white/90">Click here for a prompt for your AI IDE</p>
+    </div>
+  </div>
+</Card>
 
 Follow these steps to integrate Morph into your application:
 
@@ -120,8 +133,7 @@ print(result)
 </CodeGroup>
 
 ## Step 3: Build Your Edit File Tool
-
-Create a powerful edit_file tool for your AI agent using Morph's apply model:
+[Paste this prompt into your AI IDE](/guides/oneshot)
 
 <AccordionGroup>
 <Accordion title="edit_file Tool Implementation">
@@ -240,31 +252,13 @@ function calculateTotal(items) {
 
 ## Enhancing Your Agent Capabilities
 
-Morph's apply model offers significant advantages over traditional LLMs for code editing:
+Morph's apply model offers significant advantages over search/replace or full file rewriting:
 
-- **Speed**: Process edits at 1600+ tokens per second
+- **Speed**: Process edits at 2000+ tokens per second
+- **Native**: Models can output code in a natural way without artifical constaints on output format which bias code results
 - **Accuracy**: Precise application of changes with context awareness
-- **Cost-effective**: Lower token usage compared to generating entire files
-- **Format preservation**: Maintains code structure and formatting
+- **Cost-effective**: >4x lower token usage compared to generating entire files
 
 <Tip>
   For access to our latest models, self-hosting, or business inquiries, please contact us at [info@morphllm.com](mailto:info@morphllm.com).
 </Tip>
-
-## Troubleshooting
-
-<AccordionGroup>
-  <Accordion title="API Authorization Error">
-    If you receive an authentication error, verify that:
-    1. You're using the correct API key
-    2. The API key is included in the Authorization header as `Bearer your-morph-api-key`
-    3. Your account is in good standing. Contact us at [support@morphllm.com](mailto:support@morphllm.com) if you need help.
-  </Accordion>
-
-  <Accordion title="Apply Model Errors">
-    When the apply model has trouble processing your edits:
-    1. Ensure you're providing sufficient context around changed lines
-    2. Use consistent comment markers for unchanged code sections
-    3. Try simplifying complex edits into smaller, more manageable changes
-  </Accordion>
-</AccordionGroup>
