@@ -1,0 +1,83 @@
+---
+title: 'Apply'
+description: 'Intelligently apply code updates with Morph'
+---
+
+<Info>
+  **Prerequisite**: You'll need an account on [Morph](https://morphllm.com/dashboard) to access the apply capabilities.
+</Info>
+
+## What is Apply?
+
+Apply is Morph's intelligent code update engine that helps you seamlessly integrate code changes into existing files. It understands both the original code and your intended updates, producing clean, consistent results.
+
+<Card
+  title="Morph Apply API"
+  icon="code-merge"
+  href="/api-reference/endpoint/apply"
+>
+  Programmatically apply code updates with precision
+</Card>
+![Error rates](/images/error.png)
+
+## Why Use Morph Apply?
+
+The best coding agents use Apply models to integrate code changes into existing files. 
+
+This lets frontier models like GPT-4o, Claude, and Gemini focus on the hard reasoning tasks, while a dumber model like Morph Apply handles the integration.
+- Patch/Diff edits are currently unreliable and often break existing code
+- Fast and Cheaper: Morph Apply is fast
+
+You should use Morph Apply in an edit_file tool call. See the [edit_file tool call](/guides/tools) for more details.
+
+## Example Usage
+
+<CodeGroup>
+```typescript apply_edit.ts
+import { OpenAI } from 'openai';
+
+const client = new OpenAI({
+  apiKey: 'your-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function applyCodeUpdate(originalCode: string, updateSnippet: string) {
+  const response = await client.chat.completions.create({
+    model: "morph-v2",
+    messages: [
+      {
+        role: "user",
+        content: `<code>${originalCode}</code>\n<update>${updateSnippet}</update>`
+      }
+    ],
+    stream: true
+  });
+  
+  return response.choices[0].message.content;
+}
+```
+
+```python apply_edit.py
+import openai
+
+client = openai.OpenAI(
+  api_key="your-api-key",
+  base_url="https://api.morphllm.com/v1"
+)
+
+def apply_code_update(originalCode: str, updateSnippet: str):
+  response = client.chat.completions.create(
+    model="morph-v2",
+    messages=[
+      {
+        "role": "user",
+        "content": f"<code>{originalCode}</code>\n<update>{updateSnippet}</update>"
+      }
+    ],
+    stream=True
+  )
+  
+  return response.choices[0].message.content
+```
+</CodeGroup>
+
