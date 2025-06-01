@@ -1,24 +1,39 @@
 ---
-title: "One Shot: Copy-Paste edit_file Tool for Cursor"
+title: "One Shot: Prompt to implement your edit_file tool"
 description: "Ready-to-use edit_file tool implementation using Morph's fast apply API - just copy and paste into your Cursor workspace"
 ---
 
-# One Shot: edit_file Tool for Cursor
 
-Get a production-ready `edit_file` tool. Paste into Cursor/Windsurf/Cline/Continue/other AI IDEs.
+
+<Card
+  icon="bolt"
+>
+  <div className="relative">
+    <img className="hidden dark:block my-0 pointer-events-none rounded-lg" src="https://mintlify.s3.us-west-1.amazonaws.com/mintlify/images/installation/local-development-dark.png" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-lg"></div>
+    <div className="absolute bottom-4 left-4 right-4">
+      <h3 className="text-2xl font-bold text-white mb-2">One-Shot the edit_file tool into your repo</h3>  
+      <p className="text-white/90">Get a production-ready `edit_file` tool. Paste into Cursor/Windsurf/Cline/Continue/other AI IDEs.</p>
+    </div>
+  </div>
+</Card>
+
+## Quick Copy-Paste Implementation
 
 <Note>
+   This example shows how to use standard tool calls to implement the `edit_file` tool.
    Many research papers have shown that having LLMs like Claude/Gemini do code edits via normal JSON tool calls results in worse overall coding performance due to constrained decoding.
    For the best coding performance, you can use XML tags for your tool calls. See how [Cline](https://docs.cline.bot/exploring-clines-tools/cline-tools-guide#cline-tools-reference-guide) and [Cursor](https://github.com/jujumilk3/leaked-system-prompts/blob/main/cursor-ide-sonnet_20241224.md) use XML tags for all their tool calls.
 </Note>
-
-## Quick Copy-Paste Implementation
 
 <CodeGroup>
 
 ``` oneshot.txt
 Implement an edit_file tool that uses Morph's fast apply API to modify files. The tool should read the current file content, send it to Morph's API at https://api.morphllm.com/v1 using the morph-v2 model with the original code in <code> tags and the proposed edit from our Agent in the <update> tags, then write the updated content back to the file. Use the MORPH_API_KEY environment variable for authentication and an OpenAI-compatible client. The tool parameters should be: target_file (string, required), instructions (string, required - single sentence describing the edit in first person), code_edit (string, required - only the lines to change with // ... existing code ... comments for unchanged sections). Return success/error status with descriptive messages and handle file I/O and API errors gracefully. Implement this now using whatever framework I'm currently using.
-Do not modify the descriptions wording at all. Read relevant files to understand how we currently do edits before implementing.
+Morph provides an OpenAI-compatible API that takes two primary inputs:
+Your original code file
+The update snippet (changes suggested by an AI Agent/LLM)
+Do not modify the descriptions/prompt wording at all. Read relevant files to understand how we currently do edits before implementing.
 
 ex: 
 import OpenAI from 'openai';
@@ -56,7 +71,7 @@ const morphClient = new OpenAI({
 });
 
 const editFile = tool({
-  description: "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nFor example:\n\n\\n// ... existing code ...\\nFIRST_EDIT\\n// ... existing code ...\\nSECOND_EDIT\\n// ... existing code ...\\nTHIRD_EDIT\\n// ... existing code ...\\n\n\nYou should still bias towards repeating as few lines of the original file as possible to convey the change.\nBut, each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.\nMake sure it is clear what the edit should be.\n\nYou should specify the following arguments before the others: [target_file]",
+  description: Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nYou should bias towards repeating as few lines of the original file as possible to convey the change.\nEach edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nIf you plan on deleting a section, you must provide surrounding context to indicate the deletion.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.\n\nYou should specify the following arguments before the others: [target_file],
   parameters: z.object({
     target_file: z.string().describe('The target file to modify. Always specify the target file as the first argument and use the relative path in the workspace of the file to edit'),
     instructions: z.string().describe('A single sentence instruction describing what you are going to do for the sketched edit. This is used to assist the less intelligent model in applying the edit. Please use the first person to describe what you are going to do. Dont repeat what you have said previously in normal messages. And use it to disambiguate uncertainty in the edit.'),

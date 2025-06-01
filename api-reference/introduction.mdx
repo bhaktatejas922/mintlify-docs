@@ -4,22 +4,33 @@ description: 'Apply edits from models like GPT-4o and Claude to your files insta
 ---
 
 ## Why use Morph?
-Frontier models like Gemini, GPT-4o, and Claude are extremely good at reasoning, but they can be extremely slow, brittle, and expensive to apply updates to your code and files. 
+Models like Gemini, GPT-4o, and Claude are extremely good at reasoning, but they can be extremely slow and expensive to apply updates to your code and files. 
 Morph Apply is a model optimized for speed, applying updates suggested by these models to original files in at 2000+ tokens per second.
 
 ## How It Works
 
-Morph provides an OpenAI-compatible API that takes two primary inputs:
-1. Your original code file
-2. The update snippet (changes suggested by an LLM)
+<div className="flex gap-8">
+  <div className="flex-1">
+    <p>Morph provides an OpenAI-compatible API that takes two primary inputs:</p>
+    <ol>
+      <li>Your original code file</li>
+      <li>The update snippet (changes suggested by an LLM)</li>
+    </ol>
+    <p>Our specialized model then applies these changes at 2500+ tokens/second with 99% accuracy.</p>
+  </div>
 
-Our specialized model then applies these changes with maximum speed (2000+ tokens/second) and accuracy, preserving code structure and formatting.
+  <div className="flex-1">
+    <Card>
+      <img src="/images/edit.jpg" alt="Morph Apply" className="w-full" />
+    </Card>
+  </div>
+</div>
 
-<img src="/images/diff-viewer.png" alt="Morph Diff Viewer" />
 
-## Self-Hosted & On-Premises Solutions
+## Dedicated Instances, Self-Hosted, & On-Premises Solutions
 
-We offer the full Morph model suite for self-hosted and on-premises deployments. For enterprise needs, security requirements, or custom integrations, reach out to [info@morphllm.com](mailto:info@morphllm.com) and we'll get back to you in under 2 hours.
+We offer the full Morph model suite with dedicated instances, self-hosted, or on-premises deployments. Reach out to [info@morphllm.com](mailto:info@morphllm.com).
+Dedicated instances see ~40% faster inference than our public API.
 
 <Card
   title="Morph API Documentation"
@@ -29,6 +40,7 @@ We offer the full Morph model suite for self-hosted and on-premises deployments.
   View our OpenAI-compatible API
 </Card>
 
+<img src="/images/diff-viewer.png" alt="Morph Diff Viewer" />
 ## Authentication
 
 All API endpoints require authentication using Bearer tokens.

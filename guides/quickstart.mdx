@@ -6,6 +6,7 @@ description: 'Get started with Morph in minutes'
 <Info>
   **Prerequisite**: You'll need an account on [Morph](https://morphllm.com/dashboard) to obtain an API key.
 </Info>
+
 <Card
   icon="zap"
   href="/guides/oneshot"
@@ -20,183 +21,41 @@ description: 'Get started with Morph in minutes'
   </div>
 </Card>
 
-Follow these steps to integrate Morph into your application:
+## ① Prompt Your Agent
 
-## Step 1: Get Your API Key
-
-The first step is to obtain an API key from the Morph dashboard:
-
-1. Go to [https://morphllm.com/dashboard](https://morphllm.com/dashboard)
-2. Create an account or sign in to your existing account
-3. Create a new API key or use the existing one
-
-Keep this API key secure as it will be used for authentication in your API requests.
-
-## Step 2: Use the Morph API
-
-Morph provides an OpenAI-compatible API for applying model-suggested changes to your code files:
-<Card
-  title="Morph API Documentation"
-  icon="bolt"
-  href="/api-reference/endpoint/apply"
->
-  View our OpenAI-compatible API
-</Card>
-## Base URL
-
-```bash
-https://api.morphllm.com/v1
-```
-
-## Compatible with OpenAI SDK
-
-Morph's API is compatible with the OpenAI SDK. You only need to change the base URL and API key:
+Add the `edit_file` tool to your AI agent with this tool definition:
 
 <CodeGroup>
 
-```typescript morph-apply.ts
-import OpenAI from 'openai';
+```xml Tool Definition (Recommended)
+<tool name="edit_file">
+  <description>
+    Use this tool to propose an edit to an existing file.
 
-// Initialize the OpenAI client with Morph's API endpoint
-const openai = new OpenAI({
-  apiKey: 'your-morph-api-key',
-  baseURL: 'https://api.morphllm.com/v1'
-});
+    This will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.
 
-async function applyChanges(originalCode: string, updatedCode: string): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: "morph-v2",
-    messages: [
-      {
-        role: "user",
-        content: `<code>${originalCode}</code>\n<update>${updatedCode}</update>`
-      }
-    ]
-  });
-  
-  return response.choices[0].message.content;
-}
+    When writing the edit, you should specify each edit in sequence, with the special comment `// ... existing code ...` to represent unchanged code in between edited lines.
 
-// Example usage
-const original = `function add(a: number, b: number): number {
-  return a + b;
-}`;
-
-const edits = `function add(a: number, b: number): number {
-  // Add validation
-  if (isNaN(a) || isNaN(b)) {
-    throw new Error('Both arguments must be valid numbers');
-  }
-  return a + b;
-}`;
-
-applyChanges(original, edits)
-  .then(result => console.log(result))
-  .catch(error => console.error('Error:', error));
+    You should bias towards repeating as few lines of the original file as possible to convey the change.
+    Each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.
+    If you plan on deleting a section, you must provide surrounding context to indicate the deletion.
+    DO NOT omit spans of pre-existing code without using the `// ... existing code ...` comment to indicate its absence.
+  </description>
+  <parameters>
+    <parameter name="target_file" type="string" required="true">
+      The target file to modify.
+    </parameter>
+    <parameter name="code_edit" type="string" required="true">
+      Specify ONLY the precise lines of code that you wish to edit. Use // ... existing code ... for unchanged sections.
+    </parameter>
+  </parameters>
+</tool>
 ```
 
-```python morph_apply.py
-from openai import OpenAI
-
-# Initialize the OpenAI client with Morph's API endpoint
-client = OpenAI(
-    api_key="your-morph-api-key",
-    base_url="https://api.morphllm.com/v1"
-)
-
-def apply_changes(original_code: str, update_snippet: str) -> str:
-    response = client.chat.completions.create(
-        model="morph-v2",
-        messages=[
-            {
-                "role": "user",
-                "content": f"<code>{original_code}</code>\n<update>{update_snippet}</update>"
-            }
-        ]
-    )
-    return response.choices[0].message.content
-
-# Example usage
-original = """def add(a: float, b: float) -> float:
-    return a + b"""
-
-edits = """def add(a: float, b: float) -> float:
-    # Add validation
-    if not isinstance(a, (int, float)) or not isinstance(b, (int, float)):
-        raise TypeError("Both arguments must be numbers")
-    return a + b"""
-
-result = apply_changes(original, edits)
-print(result)
-```
-
-</CodeGroup>
-
-## Step 3: Build Your Edit File Tool
-[Paste this prompt into your AI IDE](/guides/oneshot)
-
-<AccordionGroup>
-<Accordion title="edit_file Tool Implementation">
-
-Here's a comprehensive implementation of an edit_file tool for your AI agent:
-
-```typescript edit-file-tool.ts
-import { promises as fs } from 'fs';
-import OpenAI from 'openai';
-
-// Initialize the OpenAI client with Morph's API endpoint
-const openai = new OpenAI({
-  apiKey: process.env.MORPH_API_KEY || 'your-morph-api-key',
-  baseURL: 'https://api.morphllm.com/v1'
-});
-
-
-// Function to edit files using the Morph apply model
-// @param params - Parameters for the edit
-// @returns Result of the edit operation
-
-async function editFile(params: {
-  target_file: string;
-  code_edit: string;
-}): Promise<{ success: boolean; message: string; error?: any }> {
-  try {
-    // 1. Read the original file
-    const originalContent = await fs.readFile(params.target_file, 'utf8');
-    
-    // 2. Send to Morph API
-    const response = await openai.chat.completions.create({
-      model: 'morph-v2',
-      messages: [
-        {
-          role: 'user',
-          content: `<code>${originalContent}</code>\n<update>${params.code_edit}</update>`
-        }
-      ]
-    });
-    
-    // 3. Write the updated content back to the file
-    await fs.writeFile(params.target_file, response.choices[0].message.content);
-    
-    return {
-      success: true,
-      message: `File ${params.target_file} was successfully updated`
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: `Error: ${error.message}`,
-      error
-    };
-  }
-}
-```
-
-**Tool Definition for AI Agent:**
-
-```json
+```json Tool Definition (Simple)
 {
   "name": "edit_file",
-  "description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by the Morph apply model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code between edited lines.",
+  "description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nYou should bias towards repeating as few lines of the original file as possible to convey the change.\nEach edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nIf you plan on deleting a section, you must provide surrounding context to indicate the deletion.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.",
   "parameters": {
     "properties": {
       "target_file": {
@@ -213,52 +72,157 @@ async function editFile(params: {
 }
 ```
 
-**Input Format:**
+</CodeGroup>
 
-The Morph API expects two key components:
-- Original code wrapped in `<code>...</code>` tags
-- Update snippet wrapped in `<update>...</update>` tags
+## ② Implement the Edit File Tool
 
-The update snippet should use truncation markers like `// ... existing code ...` to indicate unchanged parts of the code.
+Your agent will call the `edit_file` tool with a `code_edit` parameter. Here's how to handle it:
 
-**Example edit pattern:**
+<CodeGroup>
 
-```
-// Original code:
-function calculateTotal(items) {
-  total = 0;
-  for item in items:
-    total += item.price;
-  return total;
+```typescript TypeScript Implementation
+import { promises as fs } from 'fs';
+import OpenAI from 'openai';
+
+// Initialize the OpenAI client with Morph's API endpoint
+const openai = new OpenAI({
+  apiKey: process.env.MORPH_API_KEY || 'your-morph-api-key',
+  baseURL: 'https://api.morphllm.com/v1'
+});
+
+async function editFile(params: {
+  target_file: string;
+  code_edit: string;
+}): Promise<{ success: boolean; message: string }> {
+  try {
+    // Read the original file
+    const originalContent = await fs.readFile(params.target_file, 'utf8');
+    
+    // Send to Morph API
+    const response = await openai.chat.completions.create({
+      model: 'morph-v2',
+      messages: [
+        {
+          role: 'user',
+          content: `<code>${originalContent}</code>\n<update>${params.code_edit}</update>`
+        }
+      ]
+    });
+    
+    // Write the updated content back to the file
+    await fs.writeFile(params.target_file, response.choices[0].message.content);
+    
+    return {
+      success: true,
+      message: `File ${params.target_file} was successfully updated`
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `Error: ${error.message}`
+    };
+  }
 }
+```
 
-// Edit with markers:
-function calculateTotal(items) {
+```python Python Implementation
+import os
+from openai import OpenAI
+
+# Initialize the OpenAI client with Morph's API endpoint
+client = OpenAI(
+    api_key=os.getenv("MORPH_API_KEY", "your-morph-api-key"),
+    base_url="https://api.morphllm.com/v1"
+)
+
+def edit_file(target_file: str, code_edit: str) -> dict:
+    try:
+        # Read the original file
+        with open(target_file, 'r', encoding='utf-8') as f:
+            original_content = f.read()
+        
+        # Send to Morph API
+        response = client.chat.completions.create(
+            model="morph-v2",
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"<code>{original_content}</code>\n<update>{code_edit}</update>"
+                }
+            ]
+        )
+        
+        # Write the updated content back to the file
+        with open(target_file, 'w', encoding='utf-8') as f:
+            f.write(response.choices[0].message.content)
+        
+        return {
+            "success": True,
+            "message": f"File {target_file} was successfully updated"
+        }
+    except Exception as error:
+        return {
+            "success": False,
+            "message": f"Error: {str(error)}"
+        }
+```
+
+</CodeGroup>
+
+## ③ Pass to Morph API
+
+The Morph API uses a simple format:
+- **Original file content** wrapped in `<code>...</code>` tags
+- **Update snippet** wrapped in `<update>...</update>` tags
+
+<Card
+  title="Morph API Documentation"
+  icon="bolt"
+  href="/api-reference/endpoint/apply"
+>
+  View our OpenAI-compatible API reference
+</Card>
+
+### API Details
+
+**Base URL:** `https://api.morphllm.com/v1`
+
+**Model:** `morph-v2`
+
+**Format Example:**
+```
+<code>
+function add(a: number, b: number): number {
+  return a + b;
+}
+</code>
+
+<update>
+function add(a: number, b: number): number {
   // ... existing code ...
-  for item in items:
-    total += item.price;
-  return total * 1.1;  // Add 10% tax
+  if (isNaN(a) || isNaN(b)) {
+    throw new Error('Both arguments must be valid numbers');
+  }
+  return a + b;
 }
+</update>
 ```
 
-**Best practices:**
+### Why This Works
 
-- Use special comments (Strongly Recommended: `// ... existing code ...`) to indicate unchanged sections
-- Provide sufficient context around edits for proper placement
-- Keep instructions concise and action-oriented
-- Minimize token usage by not repeating large unchanged sections
-</Accordion>
-</AccordionGroup>
-
-## Enhancing Your Agent Capabilities
-
-Morph's apply model offers significant advantages over search/replace or full file rewriting:
-
-- **Speed**: Process edits at 2000+ tokens per second
-- **Native**: Models can output code in a natural way without artifical constaints on output format which bias code results
-- **Accuracy**: Precise application of changes with context awareness
-- **Cost-effective**: >4x lower token usage compared to generating entire files
+- **🚀 2000+ tokens/sec** - Faster than any other approach
+- **🎯 Precise edits** - Context-aware application of changes  
+- **💰 Cost-effective** - 4x lower token usage vs full file rewrites
+- **🔧 Native output** - Models write code naturally without format constraints
 
 <Tip>
-  For access to our latest models, self-hosting, or business inquiries, please contact us at [info@morphllm.com](mailto:info@morphllm.com).
+  **Pro tip**: Use `// ... existing code ...` markers to minimize token usage while providing sufficient context for accurate edits.
 </Tip>
+
+---
+
+**Ready to integrate?** Get your API key from the [Morph Dashboard](https://morphllm.com/dashboard) and start applying edits at lightning speed.
+
+<Info>
+  For access to our latest models, self-hosting, or business inquiries, contact us at [info@morphllm.com](mailto:info@morphllm.com).
+</Info>

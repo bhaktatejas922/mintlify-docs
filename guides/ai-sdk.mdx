@@ -1,0 +1,561 @@
+---
+title: "Using Morph with Vercel AI SDK"
+description: "Stream fast code edits with Morph Apply using the Vercel AI SDK for real-time collaborative editing experiences"
+---
+
+# Morph + Vercel AI SDK: Streaming Code Edits
+
+The Vercel AI SDK provides powerful primitives for building AI-powered applications. When combined with Morph's blazing-fast apply model, you can create real-time code editing experiences that feel instant.
+
+## Why AI SDK + Morph?
+
+**Streaming Performance**: Stream code edits at 2000+ tokens/second directly to your UI
+**React Integration**: Built-in hooks for managing streaming state and UI updates  
+**Type Safety**: Full TypeScript support with proper typing for streaming responses
+**Real-time UX**: Show edits being applied character-by-character for immediate feedback
+
+## Quick Setup
+
+Install the AI SDK and configure it to work with Morph's OpenAI-compatible API:
+
+```bash
+npm install ai
+```
+
+## Basic Streaming Implementation
+
+<CodeGroup>
+
+```typescript app/api/morph/route.ts
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+// Configure the AI SDK to use Morph's API
+const morphClient = openai({
+  apiKey: process.env.MORPH_API_KEY!,
+  baseURL: 'https://api.morphllm.com/v1',
+});
+
+export async function POST(req: Request) {
+  const { originalCode, updateSnippet } = await req.json();
+
+  const result = await streamText({
+    model: morphClient('morph-v2'),
+    messages: [
+      {
+        role: 'user',
+        content: `<code>${originalCode}</code>\n<update>${updateSnippet}</update>`
+      }
+    ],
+  });
+
+  return result.toAIStreamResponse();
+}
+```
+
+```typescript components/CodeEditor.tsx
+'use client';
+
+import { useCompletion } from 'ai/react';
+import { useState } from 'react';
+
+export function CodeEditor() {
+  const [originalCode, setOriginalCode] = useState('');
+  const [updateSnippet, setUpdateSnippet] = useState('');
+  
+  const {
+    completion,
+    input,
+    stop,
+    isLoading,
+    complete,
+  } = useCompletion({
+    api: '/api/morph',
+  });
+
+  const handleApplyEdit = async () => {
+    await complete('', {
+      body: {
+        originalCode,
+        updateSnippet,
+      },
+    });
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-4 h-screen p-4">
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-2">Original Code</label>
+          <textarea
+            value={originalCode}
+            onChange={(e) => setOriginalCode(e.target.value)}
+            className="w-full h-64 p-3 border rounded-lg font-mono text-sm"
+            placeholder="Paste your original code here..."
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium mb-2">Edit Instructions</label>
+          <textarea
+            value={updateSnippet}
+            onChange={(e) => setUpdateSnippet(e.target.value)}
+            className="w-full h-32 p-3 border rounded-lg font-mono text-sm"
+            placeholder="Describe the changes or paste updated code..."
+          />
+        </div>
+        
+        <button
+          onClick={handleApplyEdit}
+          disabled={isLoading || !originalCode || !updateSnippet}
+          className="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+        >
+          {isLoading ? 'Applying Edit...' : 'Apply Edit'}
+        </button>
+        
+        {isLoading && (
+          <button
+            onClick={stop}
+            className="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+          >
+            Stop Generation
+          </button>
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          Streaming Result
+          {isLoading && <span className="ml-2 text-green-600">● Streaming...</span>}
+        </label>
+        <pre className="w-full h-96 p-3 border rounded-lg font-mono text-sm bg-gray-50 overflow-auto">
+          {completion || 'Your edited code will appear here...'}
+        </pre>
+      </div>
+    </div>
+  );
+}
+```
+
+</CodeGroup>
+
+## Advanced Streaming with Code Diffs
+
+Create a more sophisticated experience that shows diffs and allows users to accept/reject changes:
+
+<CodeGroup>
+
+```typescript hooks/useMorphStream.ts
+import { useCompletion } from 'ai/react';
+import { useState, useCallback } from 'react';
+
+interface MorphStreamOptions {
+  onComplete?: (result: string) => void;
+  onError?: (error: Error) => void;
+}
+
+export function useMorphStream(options: MorphStreamOptions = {}) {
+  const [originalCode, setOriginalCode] = useState('');
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+  
+  const {
+    completion,
+    isLoading,
+    error,
+    complete,
+    stop,
+  } = useCompletion({
+    api: '/api/morph',
+    onFinish: (prompt, completion) => {
+      setAppliedCode(completion);
+      options.onComplete?.(completion);
+    },
+    onError: options.onError,
+  });
+
+  const applyEdit = useCallback(async (code: string, edit: string) => {
+    setOriginalCode(code);
+    setAppliedCode(null);
+    
+    await complete('', {
+      body: {
+        originalCode: code,
+        updateSnippet: edit,
+      },
+    });
+  }, [complete]);
+
+  const acceptChanges = useCallback(() => {
+    if (appliedCode) {
+      setOriginalCode(appliedCode);
+      setAppliedCode(null);
+    }
+  }, [appliedCode]);
+
+  const rejectChanges = useCallback(() => {
+    setAppliedCode(null);
+  }, []);
+
+  return {
+    originalCode,
+    streamingCode: completion,
+    appliedCode,
+    isLoading,
+    error,
+    applyEdit,
+    acceptChanges,
+    rejectChanges,
+    stop,
+  };
+}
+```
+
+```typescript components/AdvancedCodeEditor.tsx
+'use client';
+
+import { useMorphStream } from '@/hooks/useMorphStream';
+import { useState } from 'react';
+import { Diff } from 'react-diff-view';
+
+export function AdvancedCodeEditor() {
+  const [editInstructions, setEditInstructions] = useState('');
+  
+  const {
+    originalCode,
+    streamingCode,
+    appliedCode,
+    isLoading,
+    error,
+    applyEdit,
+    acceptChanges,
+    rejectChanges,
+    stop,
+  } = useMorphStream({
+    onComplete: (result) => {
+      console.log('Edit completed:', result);
+    },
+    onError: (error) => {
+      console.error('Edit failed:', error);
+    },
+  });
+
+  const handleApplyEdit = async () => {
+    if (!originalCode.trim() || !editInstructions.trim()) return;
+    await applyEdit(originalCode, editInstructions);
+  };
+
+  return (
+    <div className="h-screen flex flex-col p-4 gap-4">
+      {/* Header */}
+      <div className="flex gap-4 items-end">
+        <div className="flex-1">
+          <label className="block text-sm font-medium mb-2">Edit Instructions</label>
+          <input
+            type="text"
+            value={editInstructions}
+            onChange={(e) => setEditInstructions(e.target.value)}
+            placeholder="Add error handling, refactor function, fix bug..."
+            className="w-full px-3 py-2 border rounded-lg"
+          />
+        </div>
+        
+        <button
+          onClick={handleApplyEdit}
+          disabled={isLoading || !originalCode.trim() || !editInstructions.trim()}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isLoading ? 'Applying...' : 'Apply Edit'}
+        </button>
+        
+        {isLoading && (
+          <button
+            onClick={stop}
+            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+          >
+            Stop
+          </button>
+        )}
+      </div>
+
+      {/* Code Areas */}
+      <div className="flex-1 grid grid-cols-2 gap-4">
+        <div className="flex flex-col">
+          <h3 className="text-lg font-semibold mb-2">Original Code</h3>
+          <textarea
+            value={originalCode}
+            onChange={(e) => setOriginalCode(e.target.value)}
+            className="flex-1 p-3 border rounded-lg font-mono text-sm resize-none"
+            placeholder="Paste your code here..."
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-lg font-semibold">
+              {isLoading ? 'Streaming Edit...' : appliedCode ? 'Applied Edit' : 'Result'}
+            </h3>
+            
+            {appliedCode && (
+              <div className="flex gap-2">
+                <button
+                  onClick={acceptChanges}
+                  className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+                >
+                  Accept
+                </button>
+                <button
+                  onClick={rejectChanges}
+                  className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+          
+          <pre className="flex-1 p-3 border rounded-lg font-mono text-sm bg-gray-50 overflow-auto">
+            {isLoading ? streamingCode : appliedCode || 'Your edited code will appear here...'}
+          </pre>
+        </div>
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <strong>Error:</strong> {error.message}
+        </div>
+      )}
+      
+      {/* Streaming Indicator */}
+      {isLoading && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg flex items-center">
+          <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-3"></div>
+          Streaming edit at 2000+ tokens/second...
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+</CodeGroup>
+
+## Batch Processing Multiple Files
+
+Stream edits across multiple files efficiently:
+
+```typescript app/api/morph/batch/route.ts
+import { openai } from '@ai-sdk/openai';
+import { streamText } from 'ai';
+
+const morphClient = openai({
+  apiKey: process.env.MORPH_API_KEY!,
+  baseURL: 'https://api.morphllm.com/v1',
+});
+
+export async function POST(req: Request) {
+  const { files, instruction } = await req.json();
+  
+  // Process files sequentially for better streaming UX
+  const results = [];
+  
+  for (const file of files) {
+    const result = await streamText({
+      model: morphClient('morph-v2'),
+      messages: [
+        {
+          role: 'user',
+          content: `<code>${file.content}</code>\n<update>${instruction}</update>`
+        }
+      ],
+    });
+    
+    results.push({
+      filename: file.name,
+      stream: result.toAIStreamResponse(),
+    });
+  }
+
+  return Response.json({ results });
+}
+```
+
+## Real-time Collaborative Editing
+
+Integrate with WebSockets for multi-user editing:
+
+```typescript components/CollaborativeEditor.tsx
+'use client';
+
+import { useCompletion } from 'ai/react';
+import { useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
+
+export function CollaborativeEditor({ roomId }: { roomId: string }) {
+  const [socket, setSocket] = useState<any>(null);
+  const [collaborators, setCollaborators] = useState<string[]>([]);
+  const [sharedCode, setSharedCode] = useState('');
+
+  const { completion, isLoading, complete } = useCompletion({
+    api: '/api/morph',
+    onFinish: (prompt, completion) => {
+      // Broadcast completed edit to all collaborators
+      socket?.emit('code-updated', {
+        roomId,
+        code: completion,
+        timestamp: Date.now(),
+      });
+    },
+  });
+
+  useEffect(() => {
+    const newSocket = io(process.env.NEXT_PUBLIC_SOCKET_URL!);
+    setSocket(newSocket);
+
+    newSocket.emit('join-room', roomId);
+
+    newSocket.on('collaborator-joined', (collaborators) => {
+      setCollaborators(collaborators);
+    });
+
+    newSocket.on('code-updated', ({ code, timestamp }) => {
+      setSharedCode(code);
+    });
+
+    newSocket.on('edit-started', ({ userId, instruction }) => {
+      // Show that someone is making an edit
+      console.log(`${userId} started editing: ${instruction}`);
+    });
+
+    return () => newSocket.close();
+  }, [roomId]);
+
+  const applySharedEdit = async (instruction: string) => {
+    // Notify collaborators that an edit is starting
+    socket?.emit('edit-started', {
+      roomId,
+      instruction,
+      timestamp: Date.now(),
+    });
+
+    await complete('', {
+      body: {
+        originalCode: sharedCode,
+        updateSnippet: instruction,
+      },
+    });
+  };
+
+  return (
+    <div className="h-screen flex flex-col p-4">
+      {/* Collaboration Header */}
+      <div className="flex justify-between items-center mb-4 p-3 bg-gray-50 rounded-lg">
+        <div>
+          <h2 className="font-semibold">Room: {roomId}</h2>
+          <p className="text-sm text-gray-600">
+            {collaborators.length} collaborator(s) online
+          </p>
+        </div>
+        
+        {isLoading && (
+          <div className="text-blue-600 flex items-center">
+            <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
+            Applying edit...
+          </div>
+        )}
+      </div>
+
+      {/* Shared Code Editor */}
+      <div className="flex-1 grid grid-cols-2 gap-4">
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Shared Code</h3>
+          <pre className="h-full p-3 border rounded-lg font-mono text-sm bg-white overflow-auto">
+            {isLoading ? completion : sharedCode || 'Start coding together...'}
+          </pre>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold mb-2">Apply Edit</h3>
+          <EditInstructionInput onSubmit={applySharedEdit} disabled={isLoading} />
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## Performance Tips
+
+### 1. Optimize Token Usage
+```typescript
+// Use truncation markers to minimize context
+const optimizedUpdate = `
+// ... existing imports ...
+${newImports}
+// ... existing code ...
+${changedFunction}
+// ... existing code ...
+`;
+```
+
+### 2. Cache Frequent Edits
+```typescript
+const editCache = new Map<string, string>();
+
+const getCachedEdit = (codeHash: string, instruction: string) => {
+  const key = `${codeHash}-${instruction}`;
+  return editCache.get(key);
+};
+```
+
+### 3. Stream with Debouncing
+```typescript
+import { useDebouncedCallback } from 'use-debounce';
+
+const debouncedEdit = useDebouncedCallback(
+  (code: string, instruction: string) => {
+    applyEdit(code, instruction);
+  },
+  500
+);
+```
+
+## Error Handling & Recovery
+
+```typescript
+const { completion, error, isLoading, complete } = useCompletion({
+  api: '/api/morph',
+  onError: (error) => {
+    // Graceful error handling
+    toast.error(`Edit failed: ${error.message}`);
+    
+    // Log for debugging
+    console.error('Morph API Error:', error);
+    
+    // Optionally retry with different parameters
+    if (error.message.includes('context_length')) {
+      // Truncate code and retry
+      retryWithShorterContext();
+    }
+  },
+  
+  // Automatic retries
+  retry: {
+    maxAttempts: 3,
+    backoff: 'exponential',
+  },
+});
+```
+
+## Next Steps
+
+**Integration Patterns**: Combine with code analysis tools for smarter edits
+**Multi-Model Support**: Use different models for different types of edits  
+**Version Control**: Track edit history and enable rollbacks
+**Custom UI**: Build domain-specific editing interfaces
+
+The AI SDK + Morph combination gives you the foundation for building sophisticated, real-time code editing experiences that feel native and responsive.
+
+<Tip>
+  For production applications, consider implementing edit queuing, conflict resolution, and automated testing pipelines to ensure code quality.
+</Tip> 

@@ -3,14 +3,15 @@ title: 'Apply Code Updates'
 openapi: 'POST /v1/chat/completions'
 ---
 
-## Overview
-
-Morph uses a standard OpenAI-compatible API. You'll use the Chat Completions endpoint with a specific formatting for your code and updates.
-
+<Card>
+  <img src="/images/edit.jpg" alt="Morph Apply" className="w-full" />
+</Card>
 ## API Endpoint
+Morph uses a standard OpenAI-compatible API.
+
 
 ```
-POST https://api.morphllm.com/v1/chat/completions
+https://api.morphllm.com/v1/chat/completions
 ```
 
 ## Example Request
@@ -72,6 +73,37 @@ The `content` field in your message should contain two parts:
 
 The update snippet should use truncation markers like `// ... existing code ...` to indicate unchanged parts of the code. Your system prompt should include instructions on how to handle these markers. 
 Read more about how to handle prompting [here](/guides/tools).
+
+### Edit File Tool Prompt
+
+```markdown
+Use this tool to propose an edit to an existing file.
+
+This will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.
+
+When writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.
+
+For example:
+
+// ... existing code ...
+FIRST_EDIT
+// ... existing code ...
+SECOND_EDIT
+// ... existing code ...
+THIRD_EDIT
+// ... existing code ...
+
+This will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.
+When writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.
+
+You should bias towards repeating as few lines of the original file as possible to convey the change.
+Each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.
+If you plan on deleting a section, you must provide surrounding context to indicate the deletion.
+DO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.`,
+
+You should specify the following arguments before the others: [target_file]
+```
+
 
 ## Example with Python
 
