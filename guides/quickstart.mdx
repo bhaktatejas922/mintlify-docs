@@ -23,36 +23,84 @@ description: 'Get started with Morph in minutes'
 
 ## ① Prompt Your Agent
 
-Add the `edit_file` tool to your AI agent with this tool definition:
+Configure your AI agent with the proper system prompt to handle code editing effectively:
 
-<CodeGroup>
+<AccordionGroup>
+<Accordion title="System Prompt Configuration">
 
-```xml Tool Definition (Recommended)
-<tool name="edit_file">
-  <description>
-    Use this tool to propose an edit to an existing file.
+Add this to your AI agent's system prompt:
 
-    This will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.
+```xml
+<making_code_changes>
+When making code changes, NEVER output code to the USER, unless requested. Instead use one of the code edit tools to implement the change. Use the code edit tools at most once per turn. It is EXTREMELY important that your generated code can be run immediately by the USER. To ensure this, follow these instructions carefully:
 
-    When writing the edit, you should specify each edit in sequence, with the special comment `// ... existing code ...` to represent unchanged code in between edited lines.
+Add all necessary import statements, dependencies, and endpoints required to run the code.
+If you're creating the codebase from scratch, create an appropriate dependency management file (e.g. requirements.txt) with package versions and a helpful README.
+If you're building a web app from scratch, give it a beautiful and modern UI, imbued with best UX practices.
+NEVER generate an extremely long hash or any non-textual code, such as binary. These are not helpful to the USER and are very expensive.
+Unless you are appending some small easy to apply edit to a file, or creating a new file, you MUST read the the contents or section of what you're editing before editing it.
+If you've introduced (linter) errors, please try to fix them. But, do NOT loop more than 3 times when doing this. On the third time, ask the user if you should keep going.
+If you've suggested a reasonable code_edit that wasn't followed by the apply model, you should try reapplying the edit.
+</making_code_changes>
 
-    You should bias towards repeating as few lines of the original file as possible to convey the change.
-    Each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.
-    If you plan on deleting a section, you must provide surrounding context to indicate the deletion.
-    DO NOT omit spans of pre-existing code without using the `// ... existing code ...` comment to indicate its absence.
-  </description>
-  <parameters>
-    <parameter name="target_file" type="string" required="true">
-      The target file to modify.
-    </parameter>
-    <parameter name="code_edit" type="string" required="true">
-      Specify ONLY the precise lines of code that you wish to edit. Use // ... existing code ... for unchanged sections.
-    </parameter>
-  </parameters>
-</tool>
+<tool_calling>
+ALWAYS follow the tool call schema exactly as specified and make sure to provide all necessary parameters.
+The conversation may reference tools that are no longer available. NEVER call tools that are not explicitly provided.
+NEVER refer to tool names when speaking to the USER. For example, instead of saying 'I need to use the edit_file tool to edit your file', just say 'I will edit your file'.
+Only calls tools when they are necessary. If the USER's task is general or you already know the answer, just respond without calling tools.
+Before calling each tool, first explain to the USER why you are calling it.
+</tool_calling>
 ```
 
-```json Tool Definition (Simple)
+These prompts ensure your agent:
+- Uses edit tools instead of outputting code directly
+- Handles errors gracefully with retry logic
+- Maintains professional communication without exposing tool names
+- Only calls tools when necessary
+
+</Accordion>
+</AccordionGroup>
+
+## ② The Edit File Tool
+
+Implement the edit_file tool in your AI agent with the proper prompt and schema:
+
+<Tabs>
+<Tab title="XML (Recommended)">
+
+**Tool Description:**
+```xml
+Use this tool to propose an edit to an existing file.
+
+This will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.
+
+When writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.
+
+For example:
+
+// ... existing code ...
+FIRST_EDIT
+// ... existing code ...
+SECOND_EDIT
+// ... existing code ...
+THIRD_EDIT
+// ... existing code ...
+
+You should bias towards repeating as few lines of the original file as possible to convey the change.
+Each edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.
+If you plan on deleting a section, you must provide surrounding context to indicate the deletion.
+DO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.
+```
+
+**Parameters:**
+- `target_file` (string, required): The target file to modify  
+- `code_edit` (string, required): Specify ONLY the precise lines of code that you wish to edit. Use `// ... existing code ...` for unchanged sections.
+
+</Tab>
+<Tab title="JSON (Simple)">
+
+**Tool Definition:**
+```json
 {
   "name": "edit_file",
   "description": "Use this tool to propose an edit to an existing file.\n\nThis will be read by a less intelligent model, which will quickly apply the edit. You should make it clear what the edit is, while also minimizing the unchanged code you write.\nWhen writing the edit, you should specify each edit in sequence, with the special comment // ... existing code ... to represent unchanged code in between edited lines.\n\nYou should bias towards repeating as few lines of the original file as possible to convey the change.\nEach edit should contain sufficient context of unchanged lines around the code you're editing to resolve ambiguity.\nIf you plan on deleting a section, you must provide surrounding context to indicate the deletion.\nDO NOT omit spans of pre-existing code without using the // ... existing code ... comment to indicate its absence.",
@@ -72,15 +120,57 @@ Add the `edit_file` tool to your AI agent with this tool definition:
 }
 ```
 
-</CodeGroup>
+</Tab>
+</Tabs>
 
-## ② Implement the Edit File Tool
+**Example Edit Pattern:**
 
-Your agent will call the `edit_file` tool with a `code_edit` parameter. Here's how to handle it:
+```javascript
+// Original code:
+function calculateTotal(items) {
+  total = 0;
+  for item in items:
+    total += item.price;
+  return total;
+}
+
+// Edit with markers:
+function calculateTotal(items) {
+  // ... existing code ...
+  for item in items:
+    total += item.price;
+  return total * 1.1;  // Add 10% tax
+}
+```
+
+**Best Practices:**
+- Use `// ... existing code ...` to indicate unchanged sections
+- Provide sufficient context around edits for proper placement
+- Keep instructions concise and action-oriented
+- Minimize token usage by not repeating large unchanged sections
+
+## ③ Pass to Morph API
+
+When your agent calls the edit_file tool, send the original file content and update snippet to Morph:
+
+<Card
+  title="Morph API Documentation"
+  icon="bolt"
+  href="/api-reference/endpoint/apply"
+>
+  View our OpenAI-compatible API
+</Card>
+
+**API Base URL:**
+```bash
+https://api.morphllm.com/v1
+```
+
+**Implementation Example:**
 
 <CodeGroup>
 
-```typescript TypeScript Implementation
+```typescript edit-file-tool.ts
 import { promises as fs } from 'fs';
 import OpenAI from 'openai';
 
@@ -93,12 +183,12 @@ const openai = new OpenAI({
 async function editFile(params: {
   target_file: string;
   code_edit: string;
-}): Promise<{ success: boolean; message: string }> {
+}): Promise<{ success: boolean; message: string; error?: any }> {
   try {
-    // Read the original file
+    // 1. Read the original file
     const originalContent = await fs.readFile(params.target_file, 'utf8');
     
-    // Send to Morph API
+    // 2. Send to Morph API
     const response = await openai.chat.completions.create({
       model: 'morph-v2',
       messages: [
@@ -109,7 +199,7 @@ async function editFile(params: {
       ]
     });
     
-    // Write the updated content back to the file
+    // 3. Write the updated content back to the file
     await fs.writeFile(params.target_file, response.choices[0].message.content);
     
     return {
@@ -119,13 +209,14 @@ async function editFile(params: {
   } catch (error) {
     return {
       success: false,
-      message: `Error: ${error.message}`
+      message: `Error: ${error.message}`,
+      error
     };
   }
 }
 ```
 
-```python Python Implementation
+```python edit_file_tool.py
 import os
 from openai import OpenAI
 
@@ -137,11 +228,11 @@ client = OpenAI(
 
 def edit_file(target_file: str, code_edit: str) -> dict:
     try:
-        # Read the original file
+        # 1. Read the original file
         with open(target_file, 'r', encoding='utf-8') as f:
             original_content = f.read()
         
-        # Send to Morph API
+        # 2. Send to Morph API
         response = client.chat.completions.create(
             model="morph-v2",
             messages=[
@@ -152,7 +243,7 @@ def edit_file(target_file: str, code_edit: str) -> dict:
             ]
         )
         
-        # Write the updated content back to the file
+        # 3. Write the updated content back to the file
         with open(target_file, 'w', encoding='utf-8') as f:
             f.write(response.choices[0].message.content)
         
@@ -163,66 +254,30 @@ def edit_file(target_file: str, code_edit: str) -> dict:
     except Exception as error:
         return {
             "success": False,
-            "message": f"Error: {str(error)}"
+            "message": f"Error: {str(error)}",
+            "error": error
         }
 ```
 
 </CodeGroup>
 
-## ③ Pass to Morph API
+**Input Format:**
 
-The Morph API uses a simple format:
-- **Original file content** wrapped in `<code>...</code>` tags
+The Morph API expects two key components:
+- **Original code** wrapped in `<code>...</code>` tags
 - **Update snippet** wrapped in `<update>...</update>` tags
 
-<Card
-  title="Morph API Documentation"
-  icon="bolt"
-  href="/api-reference/endpoint/apply"
->
-  View our OpenAI-compatible API reference
-</Card>
+The update snippet should use truncation markers like `// ... existing code ...` to indicate unchanged parts of the code.
 
-### API Details
+**Why Morph?**
 
-**Base URL:** `https://api.morphllm.com/v1`
+Morph's apply model offers significant advantages over search/replace or full file rewriting:
 
-**Model:** `morph-v2`
-
-**Format Example:**
-```
-<code>
-function add(a: number, b: number): number {
-  return a + b;
-}
-</code>
-
-<update>
-function add(a: number, b: number): number {
-  // ... existing code ...
-  if (isNaN(a) || isNaN(b)) {
-    throw new Error('Both arguments must be valid numbers');
-  }
-  return a + b;
-}
-</update>
-```
-
-### Why This Works
-
-- **🚀 2000+ tokens/sec** - Faster than any other approach
-- **🎯 Precise edits** - Context-aware application of changes  
-- **💰 Cost-effective** - 4x lower token usage vs full file rewrites
-- **🔧 Native output** - Models write code naturally without format constraints
+- **Speed**: Process edits at 2000+ tokens per second
+- **Native**: Models can output code in a natural way without artificial constraints on output format which bias code results
+- **Accuracy**: Precise application of changes with context awareness
+- **Cost-effective**: >4x lower token usage compared to generating entire files
 
 <Tip>
-  **Pro tip**: Use `// ... existing code ...` markers to minimize token usage while providing sufficient context for accurate edits.
+  For access to our latest models, self-hosting, or business inquiries, please contact us at [info@morphllm.com](mailto:info@morphllm.com).
 </Tip>
-
----
-
-**Ready to integrate?** Get your API key from the [Morph Dashboard](https://morphllm.com/dashboard) and start applying edits at lightning speed.
-
-<Info>
-  For access to our latest models, self-hosting, or business inquiries, contact us at [info@morphllm.com](mailto:info@morphllm.com).
-</Info>
