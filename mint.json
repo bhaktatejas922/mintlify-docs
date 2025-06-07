@@ -1,0 +1,73 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "prism",
+  "name": "Morph Documentation",
+  "colors": {
+    "primary": "#16A34A",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "favicon": "/favicon.ico",
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "api-reference/introduction",
+        "guides/quickstart"
+      ]
+    },
+    {
+      "group": "Models",
+      "pages": [
+        "guides/apply",
+        "guides/retrieval"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/prompting",
+        "guides/tools",
+        "guides/platejs",
+        "guides/ai-sdk",
+        "guides/xml-tool-calls"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/endpoint/apply",
+        "api-reference/endpoint/embedding",
+        "api-reference/endpoint/rerank"
+      ]
+    }
+  ],
+  "anchors": [
+    {
+      "name": "Website",
+      "url": "https://morphllm.com",
+      "icon": "globe"
+    },
+    {
+      "name": "Community",
+      "url": "https://discord.gg/Kxxes37E",
+      "icon": "discord"
+    },
+    {
+      "name": "Blog",
+      "url": "https://morphllm.com/blog",
+      "icon": "newspaper"
+    }
+  ],
+  "logo": {
+    "light": "/logo/newmorphlogo.jpg",
+    "dark": "/logo/newmorphlogo.jpg",
+    "href": "https://morphllm.com"
+  },
+  "footer": {
+    "socials": {
+      "x": "https://x.com/morphllm",
+      "linkedin": "https://linkedin.com/company/morphllm"
+    }
+  }
+}

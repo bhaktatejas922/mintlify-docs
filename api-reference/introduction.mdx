@@ -13,10 +13,10 @@ Morph Apply is a model optimized for speed, applying updates suggested by these 
   <div className="flex-1">
     <p>Morph provides an OpenAI-compatible API that takes two primary inputs:</p>
     <ol>
-      <li>Your original code file</li>
+      <li>Your original code/text file</li>
       <li>The update snippet (changes suggested by an LLM)</li>
     </ol>
-    <p>Our specialized model then applies these changes at 2500+ tokens/second with 99% accuracy.</p>
+    <p>Our specialized model then applies these changes at 2000+ tokens/second with 99% accuracy.</p>
   </div>
 
   <div className="flex-1">
@@ -27,10 +27,10 @@ Morph Apply is a model optimized for speed, applying updates suggested by these 
 </div>
 
 
-## Dedicated Instances, Self-Hosted, & On-Premises Solutions
-
+<Info>
 We offer the full Morph model suite with dedicated instances, self-hosted, or on-premises deployments. Reach out to [info@morphllm.com](mailto:info@morphllm.com).
 Dedicated instances see ~40% faster inference than our public API.
+</Info>
 
 <Card
   title="Morph API Documentation"
@@ -61,3 +61,56 @@ https://api.morphllm.com/v1
 ## Compatible with OpenAI SDK
 
 Morph's API is compatible with the OpenAI SDK. You only need to change the base URL and API key:
+
+<CodeGroup>
+
+```javascript JavaScript/Node.js
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+    baseURL: 'https://api.morphllm.com/v1',
+    apiKey: 'your-morph-api-key'
+});
+
+// Use the client exactly like OpenAI
+const response = await openai.chat.completions.create({
+    model: 'morph-apply',
+    messages: [
+        { role: 'user', content: 'Apply this edit to my code...' }
+    ]
+});
+```
+
+```python Python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://api.morphllm.com/v1",
+    api_key="your-morph-api-key"
+)
+
+# Use the client exactly like OpenAI
+response = client.chat.completions.create(
+    model="morph-apply",
+    messages=[
+        {"role": "user", "content": "Apply this edit to my code..."}
+    ]
+)
+```
+
+```bash cURL
+curl -X POST https://api.morphllm.com/v1/chat/completions \
+  -H "Authorization: Bearer your-morph-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "morph-apply",
+    "messages": [
+      {
+        "role": "user", 
+        "content": "Apply this edit to my code..."
+      }
+    ]
+  }'
+```
+
+</CodeGroup>

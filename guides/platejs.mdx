@@ -1,170 +1,55 @@
 ---
 title: "Document-Wide Edits with Plate.js + Morph"
-description: "Use Morph Apply for lightning-fast document-wide transformations in Plate.js rich text editors"
+description: "Build lightning-fast document transformation features using Morph Apply with Plate.js rich text editors"
 ---
-
-<Note>
-  This guide is a work in progress.
-</Note>
 
 # Document-Wide Edits with Plate.js + Morph
 
-While Plate.js has excellent built-in AI for local content generation and improvements, **Morph Apply excels at fast, document-wide transformations**. Use Morph when you need to restructure, reformat, or completely transform entire documents at 2000+ tokens/second.
+## Why Morph + Plate.js?
 
-## What Morph Does Best for Rich Text
+While Plate.js excels at local content generation and improvements, **Morph Apply is purpose-built for fast, document-wide transformations**. This combination gives you:
 
-**Document Restructuring**: Reorganize entire documents with new headings, sections, and flow
-**Style Transformations**: Convert writing style across entire documents (formal ↔ casual, technical ↔ accessible)
-**Format Conversions**: Transform document types (blog post → technical spec, notes → article)
-**Bulk Content Edits**: Apply consistent changes across all sections simultaneously
+- **Lightning Speed**: Transform entire documents at 2000+ tokens/second
+- **Document-Wide Scope**: Restructure, reformat, and transform complete documents
+- **Consistent Results**: Apply uniform changes across all content simultaneously
+- **Custom-Trained for Code**: Optimized for file and document transformations
 
 ## Quick Setup
 
+First, install the required dependencies:
+
 ```bash
-npm install @udecode/plate-ai @udecode/plate-markdown
+npm install @udecode/plate-common @udecode/plate-markdown @udecode/plate-basic-nodes
 ```
 
-## Basic Document-Wide Editor
+Get your Morph API key from the [Morph Dashboard](https://docs.morphllm.com/) and add it to your environment:
 
-<CodeGroup>
-
-```tsx components/DocumentTransformEditor.tsx
-'use client';
-
-import { Plate, PlateContent, createPlateEditor } from '@udecode/plate-common/react';
-import { MarkdownPlugin } from '@udecode/plate-markdown';
-import { basicNodesPlugins } from '@udecode/plate-basic-nodes';
-import { useState } from 'react';
-
-export function DocumentTransformEditor() {
-  const [isTransforming, setIsTransforming] = useState(false);
-  
-  const editor = createPlateEditor({
-    plugins: [
-      ...basicNodesPlugins,
-      MarkdownPlugin,
-    ],
-  });
-
-  const transformDocument = async (transformation: string) => {
-    setIsTransforming(true);
-    
-    try {
-      // Get entire document as markdown
-      const fullDocument = editor.api.markdown.serialize();
-      
-      // Send to Morph for document-wide transformation
-      const response = await fetch('/api/morph/transform', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          document: fullDocument,
-          transformation
-        }),
-      });
-
-      const transformedMarkdown = await response.text();
-      
-      // Replace entire document with transformed content
-      const newNodes = editor.api.markdown.deserialize(transformedMarkdown);
-      editor.children = newNodes;
-      editor.onChange();
-      
-    } catch (error) {
-      console.error('Document transformation failed:', error);
-    } finally {
-      setIsTransforming(false);
-    }
-  };
-
-  return (
-    <div className="h-screen flex">
-      {/* Document Editor */}
-      <div className="flex-1 flex flex-col">
-        <Plate editor={editor}>
-          <PlateContent 
-            className="flex-1 p-6 focus:outline-none"
-            placeholder="Write your document here..."
-          />
-        </Plate>
-      </div>
-
-      {/* Transform Panel */}
-      <div className="w-80 border-l bg-gray-50 p-4">
-        <h3 className="font-semibold mb-4">Document Transformations</h3>
-        
-        <div className="space-y-2">
-          <TransformButton
-            onClick={() => transformDocument('Restructure this document with clear headings, subheadings, and logical flow')}
-            disabled={isTransforming}
-            label="Restructure Document"
-          />
-          
-          <TransformButton
-            onClick={() => transformDocument('Convert this to a formal, professional tone throughout')}
-            disabled={isTransforming}
-            label="Make Formal"
-          />
-          
-          <TransformButton
-            onClick={() => transformDocument('Convert this to a casual, conversational tone throughout')}
-            disabled={isTransforming}
-            label="Make Casual"
-          />
-          
-          <TransformButton
-            onClick={() => transformDocument('Transform this into a technical specification with clear sections and requirements')}
-            disabled={isTransforming}
-            label="→ Tech Spec"
-          />
-          
-          <TransformButton
-            onClick={() => transformDocument('Convert this into a blog post with engaging headings and examples')}
-            disabled={isTransforming}
-            label="→ Blog Post"
-          />
-          
-          <TransformButton
-            onClick={() => transformDocument('Add consistent formatting, improve clarity, and fix any structural issues throughout')}
-            disabled={isTransforming}
-            label="Polish & Format"
-          />
-        </div>
-
-        {isTransforming && (
-          <div className="mt-4 p-3 bg-blue-100 rounded-lg">
-            <div className="flex items-center text-blue-700">
-              <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full mr-2"></div>
-              Transforming document...
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TransformButton({ onClick, disabled, label }: {
-  onClick: () => void;
-  disabled: boolean;
-  label: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full text-left px-3 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-    >
-      {label}
-    </button>
-  );
-}
+```bash
+MORPH_API_KEY=your_morph_api_key_here
 ```
 
-```typescript app/api/morph/transform/route.ts
+## Core Implementation
+
+### 1. Define Your Transformations
+
+Create a constants file with your transformation prompts:
+
+```typescript lib/constants.ts
+export const TRANSFORMS = {
+  restructure: 'Reorganize with clear headings and logical flow',
+  summarize: 'Add executive summary and key insights',
+  simplify: 'Rewrite using simpler language',
+} as const;
+```
+
+### 2. Create the Morph API Route
+
+Create a streaming API route to showcase Morph's speed:
+
+```typescript app/api/morph/route.ts
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
+const morph = new OpenAI({
   apiKey: process.env.MORPH_API_KEY!,
   baseURL: 'https://api.morphllm.com/v1',
 });
@@ -172,391 +57,169 @@ const openai = new OpenAI({
 export async function POST(req: Request) {
   const { document, transformation } = await req.json();
 
-  const response = await openai.chat.completions.create({
+  const stream = await morph.chat.completions.create({
     model: 'morph-v2',
-    messages: [
-      {
-        role: 'user',
-        content: `<code>${document}</code>\n<update>${transformation}</update>`
-      }
-    ],
-    stream: false,
+    messages: [{
+      role: 'user',
+      content: `<code>${document}</code>\n<update>${transformation}</update>`
+    }],
+    stream: true,
   });
 
-  return new Response(response.choices[0].message.content, {
-    headers: { 'Content-Type': 'text/plain' },
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream({
+    async start(controller) {
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          controller.enqueue(encoder.encode(content));
+        }
+      }
+      controller.close();
+    },
+  });
+
+  return new Response(readable, {
+    headers: { 'Transfer-Encoding': 'chunked' },
   });
 }
 ```
 
-</CodeGroup>
+### 3. Build the Document Editor
 
-## Streaming Document Transforms
-
-For large documents, stream the transformation in real-time:
-
-```tsx components/StreamingTransformEditor.tsx
+```tsx components/MorphDocumentEditor.tsx
 'use client';
 
+import { Plate, PlateContent, createPlateEditor } from '@udecode/plate-common/react';
+import { MarkdownPlugin } from '@udecode/plate-markdown';
+import { basicNodesPlugins } from '@udecode/plate-basic-nodes';
 import { useState } from 'react';
-import { Plate, PlateContent } from '@udecode/plate-common/react';
+import { TRANSFORMS } from '@/lib/constants';
 
-export function StreamingTransformEditor() {
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
+export function MorphDocumentEditor() {
+  const [editor] = useState(() => createPlateEditor({
+    plugins: [...basicNodesPlugins, MarkdownPlugin],
+  }));
+  const [isTransforming, setIsTransforming] = useState(false);
 
-  const streamTransform = async (transformation: string) => {
-    setIsStreaming(true);
-    setStreamingContent('');
-
-    const fullDocument = editor.api.markdown.serialize();
+  const handleTransform = async (transformKey: keyof typeof TRANSFORMS) => {
+    setIsTransforming(true);
     
-    const response = await fetch('/api/morph/stream', {
+    const document = editor.api.markdown.serialize();
+    
+    const response = await fetch('/api/morph', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ document: fullDocument, transformation }),
+      body: JSON.stringify({
+        document,
+        transformation: TRANSFORMS[transformKey],
+      }),
     });
 
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
-    let accumulated = '';
+    let result = '';
 
-    while (reader) {
-      const { done, value } = await reader.read();
+    while (true) {
+      const { done, value } = await reader!.read();
       if (done) break;
-
-      const chunk = decoder.decode(value);
-      accumulated += chunk;
-      setStreamingContent(accumulated);
+      result += decoder.decode(value);
     }
-
-    // Apply final transformed content
-    const newNodes = editor.api.markdown.deserialize(accumulated);
+    
+    const newNodes = editor.api.markdown.deserialize(result);
     editor.children = newNodes;
     editor.onChange();
     
-    setIsStreaming(false);
-    setStreamingContent('');
+    setIsTransforming(false);
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 h-screen p-4">
-      <div className="flex flex-col">
-        <h3 className="text-lg font-semibold mb-2">Original Document</h3>
+    <div className="h-screen flex">
+      <div className="flex-1">
         <Plate editor={editor}>
-          <PlateContent className="flex-1 p-4 border rounded-lg" />
+          <PlateContent 
+            className="h-full p-6 focus:outline-none"
+            placeholder="Start writing your document here..."
+          />
         </Plate>
       </div>
 
-      <div className="flex flex-col">
-        <h3 className="text-lg font-semibold mb-2">
-          Live Transformation 
-          {isStreaming && <span className="text-blue-600 ml-2">● Streaming...</span>}
-        </h3>
-        <div className="flex-1 p-4 border rounded-lg bg-gray-50 overflow-auto">
-          <pre className="whitespace-pre-wrap font-sans">
-            {streamingContent || 'Transformed document will appear here...'}
-          </pre>
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-## Advanced Document Operations
-
-### Custom Transformation Templates
-
-```tsx hooks/useDocumentTransforms.ts
-export const DOCUMENT_TRANSFORMS = {
-  restructure: {
-    name: 'Restructure',
-    prompt: 'Reorganize this document with clear headings, logical flow, and proper section hierarchy',
-  },
-  summarize: {
-    name: 'Create Executive Summary',
-    prompt: 'Create a comprehensive executive summary at the top, then restructure the content with key insights highlighted',
-  },
-  expand: {
-    name: 'Expand with Details',
-    prompt: 'Expand each section with more detailed explanations, examples, and supporting information',
-  },
-  simplify: {
-    name: 'Simplify Language',
-    prompt: 'Rewrite the entire document using simpler language while maintaining all key information',
-  },
-  academic: {
-    name: 'Academic Style',
-    prompt: 'Transform into academic writing style with proper citations, formal tone, and structured arguments',
-  },
-  business: {
-    name: 'Business Proposal',
-    prompt: 'Convert into a business proposal format with executive summary, problem statement, solution, and next steps',
-  },
-  tutorial: {
-    name: 'Step-by-Step Tutorial',
-    prompt: 'Restructure as a step-by-step tutorial with clear instructions, prerequisites, and examples',
-  },
-};
-
-export function useDocumentTransforms(editor: PlateEditor) {
-  const [isTransforming, setIsTransforming] = useState(false);
-
-  const transform = async (transformKey: keyof typeof DOCUMENT_TRANSFORMS) => {
-    setIsTransforming(true);
-    
-    const transform = DOCUMENT_TRANSFORMS[transformKey];
-    const fullDocument = editor.api.markdown.serialize();
-    
-    try {
-      const response = await fetch('/api/morph/transform', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          document: fullDocument,
-          transformation: transform.prompt,
-        }),
-      });
-
-      const transformedContent = await response.text();
-      const newNodes = editor.api.markdown.deserialize(transformedContent);
-      
-      editor.children = newNodes;
-      editor.onChange();
-    } finally {
-      setIsTransforming(false);
-    }
-  };
-
-  return { transform, isTransforming, transforms: DOCUMENT_TRANSFORMS };
-}
-```
-
-### Document Analysis & Transformation
-
-```tsx components/DocumentAnalyzer.tsx
-'use client';
-
-import { useState } from 'react';
-import { useDocumentTransforms } from '@/hooks/useDocumentTransforms';
-
-export function DocumentAnalyzer({ editor }: { editor: PlateEditor }) {
-  const [analysis, setAnalysis] = useState<string | null>(null);
-  const { transform, isTransforming, transforms } = useDocumentTransforms(editor);
-
-  const analyzeDocument = async () => {
-    const fullDocument = editor.api.markdown.serialize();
-    
-    const response = await fetch('/api/morph/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        document: fullDocument,
-        analysis: 'Analyze this document structure, identify areas for improvement, and suggest specific transformations',
-      }),
-    });
-
-    const analysisResult = await response.text();
-    setAnalysis(analysisResult);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <button
-          onClick={analyzeDocument}
-          className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          Analyze Document
-        </button>
-      </div>
-
-      {analysis && (
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h4 className="font-semibold mb-2">Document Analysis</h4>
-          <div className="text-sm text-gray-700 whitespace-pre-wrap">
-            {analysis}
-          </div>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <h4 className="font-semibold">Quick Transformations</h4>
-        {Object.entries(transforms).map(([key, transform]) => (
+      <div className="w-64 border-l bg-gray-50 p-4">
+        <h3 className="font-semibold mb-4">Morph Transformations</h3>
+        
+        {Object.entries(TRANSFORMS).map(([key, description]) => (
           <button
             key={key}
-            onClick={() => transform(key as keyof typeof transforms)}
+            onClick={() => handleTransform(key as keyof typeof TRANSFORMS)}
             disabled={isTransforming}
-            className="w-full text-left px-3 py-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            className="w-full mb-2 p-3 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50"
           >
-            {transform.name}
+            <div className="font-medium capitalize">{key}</div>
+            <div className="text-xs text-gray-500 mt-1">{description}</div>
           </button>
         ))}
-      </div>
-    </div>
-  );
-}
-```
 
-## Batch Document Processing
-
-For processing multiple documents or sections:
-
-```tsx components/BatchDocumentProcessor.tsx
-'use client';
-
-interface DocumentSection {
-  id: string;
-  title: string;
-  content: string;
-}
-
-export function BatchDocumentProcessor() {
-  const [sections, setSections] = useState<DocumentSection[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  const processSections = async (transformation: string) => {
-    setIsProcessing(true);
-
-    try {
-      const results = await Promise.all(
-        sections.map(async (section) => {
-          const response = await fetch('/api/morph/transform', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              document: section.content,
-              transformation: `${transformation}\n\nFocus on this section: "${section.title}"`,
-            }),
-          });
-
-          const transformed = await response.text();
-          return { ...section, content: transformed };
-        })
-      );
-
-      setSections(results);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-2">
-        <button
-          onClick={() => processSections('Improve clarity and readability')}
-          disabled={isProcessing}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          Polish All Sections
-        </button>
-        
-        <button
-          onClick={() => processSections('Make more technical and detailed')}
-          disabled={isProcessing}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
-        >
-          Make Technical
-        </button>
-      </div>
-
-      {isProcessing && (
-        <div className="text-blue-600">
-          Processing {sections.length} sections...
-        </div>
-      )}
-
-      <div className="space-y-4">
-        {sections.map((section) => (
-          <div key={section.id} className="border rounded-lg p-4">
-            <h3 className="font-semibold mb-2">{section.title}</h3>
-            <div className="text-sm text-gray-700">{section.content}</div>
+        {isTransforming && (
+          <div className="mt-4 p-3 bg-blue-100 rounded-lg text-blue-700 text-sm">
+            ⚡ Streaming from Morph...
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
-}
-```
-
-## Production Considerations
-
-### Document Backup & History
-
-```tsx hooks/useDocumentHistory.ts
-export function useDocumentHistory(editor: PlateEditor) {
-  const [history, setHistory] = useState<Array<{
-    timestamp: Date;
-    content: string;
-    transformation: string;
-  }>>([]);
-
-  const saveSnapshot = (transformation: string) => {
-    const content = editor.api.markdown.serialize();
-    setHistory(prev => [...prev, {
-      timestamp: new Date(),
-      content,
-      transformation,
-    }]);
-  };
-
-  const restoreSnapshot = (index: number) => {
-    const snapshot = history[index];
-    if (snapshot) {
-      const nodes = editor.api.markdown.deserialize(snapshot.content);
-      editor.children = nodes;
-      editor.onChange();
-    }
-  };
-
-  return { history, saveSnapshot, restoreSnapshot };
-}
-```
-
-### Performance for Large Documents
-
-```tsx utils/documentChunking.ts
-export function chunkDocument(content: string, maxChunkSize: number = 4000): string[] {
-  const sections = content.split(/\n#{1,3}\s/); // Split on headers
-  const chunks: string[] = [];
-  let currentChunk = '';
-
-  for (const section of sections) {
-    if (currentChunk.length + section.length > maxChunkSize) {
-      if (currentChunk) chunks.push(currentChunk);
-      currentChunk = section;
-    } else {
-      currentChunk += (currentChunk ? '\n# ' : '') + section;
-    }
-  }
-
-  if (currentChunk) chunks.push(currentChunk);
-  return chunks;
-}
-
-export async function transformLargeDocument(
-  document: string,
-  transformation: string
-): Promise<string> {
-  const chunks = chunkDocument(document);
-  const transformedChunks = await Promise.all(
-    chunks.map(chunk => transformChunk(chunk, transformation))
-  );
-  return transformedChunks.join('\n\n');
 }
 ```
 
 ## Key Benefits
 
-**Speed**: Transform entire documents in seconds, not minutes
-**Consistency**: Apply changes uniformly across all content
-**Scope**: Handle document-wide restructuring that's impossible with local AI
-**Efficiency**: Process large documents that would overwhelm other approaches
+- **Lightning Fast**: Transform entire documents at 2000+ tokens per second
+- **Real-time Streaming**: Users see content being generated as it happens
+- **Document-Wide Scope**: Handle complete document restructuring that's impossible with local AI approaches
+- **Large Document Handling**: No timeout issues with long documents
+- **Consistent Results**: Apply uniform changes across all content sections simultaneously
+- **Perfect Integration**: Seamlessly integrates with Plate.js's existing markdown serialization
 
-This approach complements Plate.js's built-in AI perfectly - use Plate's AI for local improvements and content generation, use Morph for fast document-wide transformations.
+## Production Best Practices
+
+<Warning>
+  Always implement proper error handling and user feedback for transformation operations.
+</Warning>
+
+### Error Handling
+
+```tsx
+// Add to your transform function
+try {
+  const result = await transform(document, transformKey);
+  if (result) {
+    // Success - update document
+  }
+} catch (error) {
+  // Show user-friendly error message
+  setError('Transformation failed. Please try again.');
+}
+```
+
+### Document Backup
+
+```tsx
+// Save document state before transformation
+const originalContent = editor.api.markdown.serialize();
+// Store in history for undo functionality
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Morph API Reference" icon="book" href="https://docs.morphllm.com/">
+    Explore the full Morph API documentation
+  </Card>
+  
+  <Card title="Plate.js Documentation" icon="edit" href="https://platejs.org/">
+    Learn more about Plate.js rich text editor
+  </Card>
+</CardGroup>
 
 <Tip>
-  For best results, combine both approaches: use Plate's AI for writing assistance and Morph for document-level transformations and restructuring.
+  Start with the basic integration, then add streaming and custom transformations as your application grows. The combination of Plate.js + Morph gives you both local AI assistance and powerful document-wide transformations.
 </Tip> 
