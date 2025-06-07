@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+This repo is a develop tool documentation that build with Mintlify, avoid using custom styles, using Mintlify default styles and components. You can reference `https://mintlify.com/docs` for syntax referrence.

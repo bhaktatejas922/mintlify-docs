@@ -1,225 +1,267 @@
 ---
-title: "Document-Wide Edits with Plate.js + Morph"
-description: "Build lightning-fast document transformation features using Morph Apply with Plate.js rich text editors"
+title: "Text Selection + Document Editing with Plate.js + Morph"
+description: "Build lightning-fast text transformation features using Morph Apply with Plate.js rich text editors"
 ---
+- **10x Faster**: Apply edits at 2000+ tokens/second vs 200 tokens/second
+- **Smart Integration**: Plate.js handles rich text, Morph handles transformations
+- **Real-time Updates**: Stream changes as they happen
 
-# Document-Wide Edits with Plate.js + Morph
+## Quick Start
 
-## Why Morph + Plate.js?
-
-While Plate.js excels at local content generation and improvements, **Morph Apply is purpose-built for fast, document-wide transformations**. This combination gives you:
-
-- **Lightning Speed**: Transform entire documents at 2000+ tokens/second
-- **Document-Wide Scope**: Restructure, reformat, and transform complete documents
-- **Consistent Results**: Apply uniform changes across all content simultaneously
-- **Custom-Trained for Code**: Optimized for file and document transformations
-
-## Quick Setup
-
-First, install the required dependencies:
+Install dependencies:
 
 ```bash
-npm install @udecode/plate-common @udecode/plate-markdown @udecode/plate-basic-nodes
+npm install @udecode/plate-common @udecode/plate-markdown @udecode/plate-basic-nodes openai
 ```
 
-Get your Morph API key from the [Morph Dashboard](https://docs.morphllm.com/) and add it to your environment:
+Add your Morph API key:
 
 ```bash
 MORPH_API_KEY=your_morph_api_key_here
 ```
 
-## Core Implementation
+## Simple Example: Morph API Route
 
-### 1. Define Your Transformations
-
-Create a constants file with your transformation prompts:
-
-```typescript lib/constants.ts
-export const TRANSFORMS = {
-  restructure: 'Reorganize with clear headings and logical flow',
-  summarize: 'Add executive summary and key insights',
-  simplify: 'Rewrite using simpler language',
-} as const;
-```
-
-### 2. Create the Morph API Route
-
-Create a streaming API route to showcase Morph's speed:
+Start with the core integration - a Morph API route that handles text transformations:
 
 ```typescript app/api/morph/route.ts
 import OpenAI from 'openai';
+import { NextRequest, NextResponse } from 'next/server';
 
 const morph = new OpenAI({
   apiKey: process.env.MORPH_API_KEY!,
   baseURL: 'https://api.morphllm.com/v1',
 });
 
-export async function POST(req: Request) {
-  const { document, transformation } = await req.json();
+export async function POST(request: NextRequest) {
+  const { selectedText, transformation, fullDocument } = await request.json();
 
+  // Morph applies transformation to the entire document
   const stream = await morph.chat.completions.create({
     model: 'morph-v2',
     messages: [{
       role: 'user',
-      content: `<code>${document}</code>\n<update>${transformation}</update>`
+      content: `<code>${fullDocument}</code>\n<update>${transformation} "${selectedText}"</update>`
     }],
     stream: true,
   });
 
+  // Stream the response back for real-time updates
   const encoder = new TextEncoder();
-  const readable = new ReadableStream({
+  return new Response(new ReadableStream({
     async start(controller) {
       for await (const chunk of stream) {
         const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          controller.enqueue(encoder.encode(content));
-        }
+        if (content) controller.enqueue(encoder.encode(content));
       }
       controller.close();
     },
-  });
-
-  return new Response(readable, {
-    headers: { 'Transfer-Encoding': 'chunked' },
-  });
+  }));
 }
 ```
 
-### 3. Build the Document Editor
+## Plate.js + Morph Integration
 
-```tsx components/MorphDocumentEditor.tsx
+Here's how they work together in a complete editor:
+
+```tsx components/MorphEditor.tsx
 'use client';
 
 import { Plate, PlateContent, createPlateEditor } from '@udecode/plate-common/react';
 import { MarkdownPlugin } from '@udecode/plate-markdown';
 import { basicNodesPlugins } from '@udecode/plate-basic-nodes';
-import { useState } from 'react';
-import { TRANSFORMS } from '@/lib/constants';
+import { useState, useRef } from 'react';
 
-export function MorphDocumentEditor() {
+export function MorphEditor() {
   const [editor] = useState(() => createPlateEditor({
     plugins: [...basicNodesPlugins, MarkdownPlugin],
   }));
+  
   const [isTransforming, setIsTransforming] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
+  const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
 
-  const handleTransform = async (transformKey: keyof typeof TRANSFORMS) => {
-    setIsTransforming(true);
+  const transformations = ['improve writing', 'simplify', 'make professional'];
+
+  // Handle text selection
+  const handleSelection = () => {
+    const selection = window.getSelection();
+    const text = selection?.toString().trim();
     
-    const document = editor.api.markdown.serialize();
-    
-    const response = await fetch('/api/morph', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        document,
-        transformation: TRANSFORMS[transformKey],
-      }),
-    });
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let result = '';
-
-    while (true) {
-      const { done, value } = await reader!.read();
-      if (done) break;
-      result += decoder.decode(value);
+    if (text) {
+      setSelectedText(text);
+      const rect = selection!.getRangeAt(0).getBoundingClientRect();
+      setMenuPosition({ x: rect.right, y: rect.bottom + 10 });
+      setShowMenu(true);
+    } else {
+      setShowMenu(false);
     }
+  };
+
+  // Apply transformation using Morph
+  const handleTransform = async (transformation: string) => {
+    setIsTransforming(true);
+    setShowMenu(false);
     
-    const newNodes = editor.api.markdown.deserialize(result);
-    editor.children = newNodes;
-    editor.onChange();
+    // Get current document content from Plate.js
+    const currentContent = editor.api.markdown.serialize();
     
-    setIsTransforming(false);
+    try {
+      const response = await fetch('/api/morph', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          selectedText,
+          transformation,
+          fullDocument: currentContent
+        })
+      });
+
+      // Stream the response and update Plate.js in real-time
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let result = '';
+
+      while (true) {
+        const { done, value } = await reader!.read();
+        if (done) break;
+        result += decoder.decode(value);
+        
+        // Update Plate.js with streaming content
+        const newNodes = editor.api.markdown.deserialize(result);
+        editor.children = newNodes;
+        editor.onChange();
+      }
+      
+    } finally {
+      setIsTransforming(false);
+      window.getSelection()?.removeAllRanges();
+    }
   };
 
   return (
-    <div className="h-screen flex">
-      <div className="flex-1">
-        <Plate editor={editor}>
-          <PlateContent 
-            className="h-full p-6 focus:outline-none"
-            placeholder="Start writing your document here..."
-          />
-        </Plate>
-      </div>
+    <div className="relative h-screen">
+      <Plate editor={editor}>
+        <PlateContent 
+          className="h-full p-6 focus:outline-none"
+          placeholder="Start writing... Select text to transform it."
+          onMouseUp={handleSelection}
+          onKeyUp={handleSelection}
+        />
+      </Plate>
 
-      <div className="w-64 border-l bg-gray-50 p-4">
-        <h3 className="font-semibold mb-4">Morph Transformations</h3>
-        
-        {Object.entries(TRANSFORMS).map(([key, description]) => (
-          <button
-            key={key}
-            onClick={() => handleTransform(key as keyof typeof TRANSFORMS)}
-            disabled={isTransforming}
-            className="w-full mb-2 p-3 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          >
-            <div className="font-medium capitalize">{key}</div>
-            <div className="text-xs text-gray-500 mt-1">{description}</div>
-          </button>
-        ))}
-
-        {isTransforming && (
-          <div className="mt-4 p-3 bg-blue-100 rounded-lg text-blue-700 text-sm">
-            ⚡ Streaming from Morph...
+      {/* Transformation Menu */}
+      {showMenu && (
+        <div
+          className="fixed z-50 bg-white border rounded-lg shadow-lg p-2"
+          style={{ left: menuPosition.x, top: menuPosition.y }}
+        >
+          <div className="text-xs text-gray-500 mb-2">
+            Transform: "{selectedText.slice(0, 25)}..."
           </div>
-        )}
-      </div>
+          {transformations.map((transform) => (
+            <button
+              key={transform}
+              onClick={() => handleTransform(transform)}
+              className="block w-full text-left px-3 py-2 hover:bg-gray-100 rounded text-sm"
+            >
+              ✨ {transform}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Loading State */}
+      {isTransforming && (
+        <div className="absolute top-4 right-4 p-3 bg-blue-100 rounded-lg text-blue-700">
+          ⚡ Morph is transforming...
+        </div>
+      )}
     </div>
   );
 }
 ```
 
-## Key Benefits
+## How It Works Together
 
-- **Lightning Fast**: Transform entire documents at 2000+ tokens per second
-- **Real-time Streaming**: Users see content being generated as it happens
-- **Document-Wide Scope**: Handle complete document restructuring that's impossible with local AI approaches
-- **Large Document Handling**: No timeout issues with long documents
-- **Consistent Results**: Apply uniform changes across all content sections simultaneously
-- **Perfect Integration**: Seamlessly integrates with Plate.js's existing markdown serialization
+1. **Plate.js** provides the rich text editing experience
+2. **User selects text** → Menu appears with transformation options  
+3. **Morph receives**: selected text + transformation + full document
+4. **Morph returns**: completely updated document (not just the selection)
+5. **Plate.js updates** with the new document content via markdown serialization
 
-## Production Best Practices
+## Key Benefits of This Integration
 
-<Warning>
-  Always implement proper error handling and user feedback for transformation operations.
-</Warning>
+**Fast Document Updates**: Morph processes entire documents at 2000+ tokens/second, while traditional approaches max out at ~200 tokens/second when applying changes.
 
-### Error Handling
+**Streaming Experience**: Users see transformations happening in real-time instead of waiting for completion.
 
-```tsx
-// Add to your transform function
-try {
-  const result = await transform(document, transformKey);
-  if (result) {
-    // Success - update document
-  }
-} catch (error) {
-  // Show user-friendly error message
-  setError('Transformation failed. Please try again.');
+**Rich Text Preservation**: Plate.js maintains formatting while Morph handles content transformation.
+
+## Advanced: Text Selection Component
+
+For more precise selection handling, you can create a dedicated component:
+
+```tsx components/SelectableText.tsx
+'use client';
+
+import { useState, useRef, useEffect } from 'react';
+
+export default function SelectableText({ content, onTransform }) {
+  const [selectedText, setSelectedText] = useState('');
+  const [showPopover, setShowPopover] = useState(false);
+  const [popoverPosition, setPopoverPosition] = useState({ x: 0, y: 0 });
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleSelection = () => {
+      const selection = window.getSelection();
+      const range = selection?.getRangeAt(0);
+      const text = range?.toString().trim();
+      
+      if (text && contentRef.current?.contains(range?.commonAncestorContainer)) {
+        setSelectedText(text);
+        const rect = range!.getBoundingClientRect();
+        setPopoverPosition({
+          x: rect.left + rect.width / 2,
+          y: rect.bottom + window.scrollY + 10
+        });
+        setShowPopover(true);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelection);
+    return () => document.removeEventListener('selectionchange', handleSelection);
+  }, []);
+
+  return (
+    <div className="relative">
+      <div ref={contentRef} className="p-4 border rounded-lg select-text">
+        {content}
+      </div>
+      
+      {showPopover && (
+        <div
+          className="fixed z-50 bg-white border rounded-lg shadow-lg p-2"
+          style={{ left: popoverPosition.x, top: popoverPosition.y }}
+        >
+          <button onClick={() => onTransform(selectedText, 'improve')}>
+            ✨ Improve writing
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
-```
-
-### Document Backup
-
-```tsx
-// Save document state before transformation
-const originalContent = editor.api.markdown.serialize();
-// Store in history for undo functionality
 ```
 
 ## Next Steps
 
-<CardGroup cols={2}>
-  <Card title="Morph API Reference" icon="book" href="https://docs.morphllm.com/">
-    Explore the full Morph API documentation
-  </Card>
-  
-  <Card title="Plate.js Documentation" icon="edit" href="https://platejs.org/">
-    Learn more about Plate.js rich text editor
-  </Card>
-</CardGroup>
+Start with the basic integration above, then enhance with:
+- Custom transformation types
+- Undo/redo functionality  
+- Multiple document formats
+- Collaborative editing features
 
-<Tip>
-  Start with the basic integration, then add streaming and custom transformations as your application grows. The combination of Plate.js + Morph gives you both local AI assistance and powerful document-wide transformations.
-</Tip> 
+The combination of Plate.js rich text editing + Morph's lightning-fast document processing gives you both great UX and exceptional performance. 
